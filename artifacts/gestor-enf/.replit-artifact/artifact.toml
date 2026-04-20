@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "GestorEnf - Jogo de Gerência de Enfermagem"
+version = "1.0.0"
+id = "artifacts/gestor-enf"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20675
+
+[services.development]
+run = "pnpm --filter @workspace/gestor-enf run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/gestor-enf", "run", "build" ]
+publicDir = "artifacts/gestor-enf/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20675"
+BASE_PATH = "/"
