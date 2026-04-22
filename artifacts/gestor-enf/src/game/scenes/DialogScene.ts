@@ -2,6 +2,7 @@ import * as Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, SCENES } from '../constants';
 import type { DialogueDef, GameState, NPCDef } from '../data/gameData';
 import { MISSIONS } from '../data/gameData';
+import { playSound } from '../utils/audio';
 
 const BOX_H = 200;
 const BOX_Y = GAME_HEIGHT - BOX_H - 24;
@@ -273,6 +274,7 @@ export class DialogScene extends Phaser.Scene {
       const zone = this.add.zone(-btnW / 2, -btnH / 2, btnW, btnH).setOrigin(0).setInteractive({ cursor: 'pointer' });
 
       zone.on('pointerover', () => {
+        playSound('hover');
         btnBg.clear();
         btnBg.fillStyle(0x1e3a5f, 1);
         btnBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
@@ -288,8 +290,8 @@ export class DialogScene extends Phaser.Scene {
         btnBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
         choiceTxt.setColor('#ecf0f1');
       });
-      zone.on('pointerdown', () => this.selectChoice(i));
-      this.input.keyboard?.once(`keydown-${i + 1}`, () => this.selectChoice(i));
+      zone.on('pointerdown', () => { playSound('click'); this.selectChoice(i); });
+      this.input.keyboard?.once(`keydown-${i + 1}`, () => { playSound('click'); this.selectChoice(i); });
 
       cont.add([btnBg, numTxt, choiceTxt, zone]);
       cont.setAlpha(0).setY(cy + 16);
@@ -309,15 +311,15 @@ export class DialogScene extends Phaser.Scene {
     }
 
     if (choice.missionEffect) {
-      const [missionId, action] = choice.missionEffect.split(':');
+      const [missionId, actionType] = choice.missionEffect.split(':');
       const progress = { ...this.state.missionProgress };
       const completed = [...this.state.completedMissions];
 
-      if (action === 'start') {
+      if (actionType === 'start') {
         progress[missionId] = 1;
-      } else if (action?.startsWith('step')) {
-        progress[missionId] = parseInt(action.replace('step', ''), 10);
-      } else if (action === 'complete') {
+      } else if (actionType?.startsWith('step')) {
+        progress[missionId] = parseInt(actionType.replace('step', ''), 10);
+      } else if (actionType === 'complete') {
         const mission = MISSIONS.find(m => m.id === missionId);
         if (mission && !completed.includes(missionId)) {
           completed.push(missionId);
@@ -336,10 +338,50 @@ export class DialogScene extends Phaser.Scene {
     rel[this.npcDef.id] = (rel[this.npcDef.id] ?? 0) + 1;
     stateUpdate.relationships = rel;
 
-    this.closeDialog(stateUpdate);
+    // Show feedback line instead of instantly closing
+    this.showingChoices = false;
+    this.choiceArea.removeAll(true);
+    this.choiceButtons = [];
+    
+    // Choose appropriate feedback line based on prestige logic or generic
+    const isGood = (choice.prestigeEffect || 0) >= 0;
+    const isMission = !!choice.missionEffect;
+    const actionType = choice.missionEffect ? choice.missionEffect.split(':')[1] : null;
+    
+    let feedbackText = choice.feedback || (isMission && actionType === 'complete' ? "Muito bem. Concluímos a tarefa." : (isGood ? "Certo, entendi." : "Não concordo muito, mas faremos assim."));
+
+    this.lines = [feedbackText];
+    this.startLine(0);
+    
+    // Wait for the feedback reading, then when E/Space is pressed again, it will end the dialog
+    // We override how the end of the line works for this special phase
+    
+    this.handleAdvance = () => {
+      if (this.isTyping) {
+        this.bodyText.setText(this.lines[this.lineIdx]);
+        this.charIdx = this.lines[this.lineIdx].length + 1;
+        this.isTyping = false;
+        this.cursor.setVisible(true);
+      } else {
+        // Actually close
+        this.closeDialog(stateUpdate);
+      }
+    };
+
+    this.input.keyboard?.off('keydown-E');
+    this.input.keyboard?.off('keydown-SPACE');
+    this.input.keyboard?.off('keydown-ESC');
+    this.input.off('pointerdown');
+    
+    this.input.keyboard?.on('keydown-E', this.handleAdvance, this);
+    this.input.keyboard?.on('keydown-SPACE', this.handleAdvance, this);
+    this.input.keyboard?.on('keydown-ESC', () => this.closeDialog(stateUpdate), this);
+    this.input.on('pointerdown', this.handleAdvance, this);
+
   }
 
   private showPedagogyNote(missionTitle: string, pedagogy: string, pedagogyRef: string, pts: number) {
+    playSound('success');
     const W = 680, H = 160;
     const c = this.add.container(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 110).setDepth(200);
 

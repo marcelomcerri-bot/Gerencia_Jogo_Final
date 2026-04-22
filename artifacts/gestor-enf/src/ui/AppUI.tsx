@@ -1,0 +1,178 @@
+import { HashRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { Play, RotateCcw, BookOpen } from "lucide-react";
+import { hasSave, clearSave } from "../game/utils/save";
+import { playSound } from "../game/utils/audio";
+
+export function AppUI({ onStartGame }: { onStartGame: () => void }) {
+  return (
+    <HashRouter>
+      <RoutesWrapper onStartGame={onStartGame} />
+    </HashRouter>
+  );
+}
+
+function RoutesWrapper({ onStartGame }: { onStartGame: () => void }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Expose navigation to window for Phaser to trigger pauses
+  useEffect(() => {
+    (window as any).reactNavigate = navigate;
+    return () => { delete (window as any).reactNavigate; }
+  }, [navigate]);
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={<HomeMenu onStartGame={onStartGame} />} />
+        <Route path="/pause" element={<PauseMenu />} />
+      </Routes>
+    </AnimatePresence>
+  );
+}
+
+function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
+  const navigate = useNavigate();
+  const [showHelp, setShowHelp] = useState(false);
+  
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-50 flex flex-col items-center justify-center pointer-events-none bg-gradient-to-t from-[#0a1628]/80 to-transparent"
+    >
+        {/* We place interactive UI over the Phaser menu scene (which plays in bg) */}
+        {!showHelp ? (
+          <div className="flex flex-col gap-4 pointer-events-auto w-80 mt-32">
+            {hasSave() && (
+              <motion.button 
+                onMouseEnter={() => playSound('hover')}
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  playSound('click');
+                  onStartGame();
+                  navigate('/game');
+                }}
+                className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-700 to-indigo-500 text-white px-8 py-5 rounded-xl shadow-lg shadow-purple-500/20 border border-purple-400 font-mono tracking-widest text-lg font-bold"
+              >
+                <Play size={24} /> CONTINUAR
+              </motion.button>
+            )}
+
+            <motion.button 
+              onMouseEnter={() => playSound('hover')}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                playSound('click');
+                clearSave();
+                onStartGame();
+                navigate('/game');
+              }}
+              className="flex items-center justify-center gap-3 bg-gradient-to-r from-teal-600 to-emerald-400 text-white px-8 py-5 rounded-xl shadow-lg shadow-teal-500/20 border border-teal-300 font-mono tracking-widest text-lg font-bold"
+            >
+              <RotateCcw size={24} /> NOVO JOGO
+            </motion.button>
+
+            <motion.button 
+              onMouseEnter={() => playSound('hover')}
+              whileHover={{ scale: 1.05, y: -2 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                playSound('click');
+                setShowHelp(true);
+              }}
+              className="flex items-center justify-center gap-3 bg-gradient-to-r from-slate-800 to-slate-700 text-slate-200 px-8 py-5 rounded-xl shadow-lg shadow-slate-900/40 border border-slate-600 font-mono tracking-widest text-lg"
+            >
+              <BookOpen size={20} /> COMO JOGAR
+            </motion.button>
+          </div>
+        ) : (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="pointer-events-auto bg-[#0a1628]/95 border-4 border-teal-500 rounded-2xl p-8 max-w-lg w-full shadow-2xl flex flex-col items-center gap-6"
+          >
+            <h2 className="text-2xl font-mono text-teal-400 font-bold">COMO JOGAR — HUAP/UFF</h2>
+            <div className="text-teal-50 font-mono text-sm space-y-2 text-center">
+              <p>🎮 WASD / Setas — Mover</p>
+              <p>🏃 SHIFT — Correr (consome energia)</p>
+              <p>💬 E — Falar com NPC / Interagir</p>
+              <p>📋 M — Ver missões e progresso</p>
+              <p>⏸️ ESC — Pausar / Voltar ao menu</p>
+              <br/>
+              <p>Explore o HUAP, fale com os profissionais e complete missões para ganhar Prestígio.</p>
+              <br/>
+              <p className="text-orange-400">🚨 CRISES: Eventos aleatórios precisam de decisão rápida — escolha com cuidado!</p>
+              <p className="text-green-400">⚡ Energia: descanse na Copa (+6/s)</p>
+              <p className="text-red-400">😰 Estresse: reduza no jardim ou copa</p>
+            </div>
+            <motion.button 
+               onMouseEnter={() => playSound('hover')}
+               whileHover={{ scale: 1.05 }}
+               whileTap={{ scale: 0.95 }}
+               onClick={() => {
+                 playSound('click');
+                 setShowHelp(false);
+               }}
+               className="mt-4 px-8 py-3 rounded-lg bg-teal-600/20 text-teal-300 border-2 border-teal-500/50 hover:bg-teal-500 hover:text-white font-mono font-bold"
+            >
+              VOLTAR
+            </motion.button>
+          </motion.div>
+        )}
+    </motion.div>
+  );
+}
+
+function PauseMenu() {
+  const navigate = useNavigate();
+  return (
+    <motion.div 
+      initial={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+      animate={{ opacity: 1, backdropFilter: 'blur(8px)' }}
+      exit={{ opacity: 0, backdropFilter: 'blur(0px)' }}
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 pointer-events-auto"
+    >
+      <div className="bg-[#0a1628] border-4 border-teal-500 rounded-2xl p-8 max-w-sm w-full shadow-2xl flex flex-col items-center gap-6">
+        <h2 className="text-3xl font-mono text-teal-400 font-bold mb-4">PAUSADO</h2>
+        
+        <motion.button 
+           onMouseEnter={() => playSound('hover')}
+           whileHover={{ scale: 1.02 }}
+           whileTap={{ scale: 0.98 }}
+           onClick={() => {
+              playSound('click');
+              navigate('/game');
+              (window as any).phaserGame?.scene.resume('GameScene');
+              (window as any).phaserGame?.scene.resume('HUDScene');
+           }}
+           className="w-full py-4 rounded-lg bg-teal-600/20 text-teal-300 border-2 border-teal-500/50 hover:bg-teal-500 hover:text-white font-mono font-bold text-lg transition-colors"
+        >
+          RETOMAR JOGO
+        </motion.button>
+
+        <motion.button 
+           onMouseEnter={() => playSound('hover')}
+           whileHover={{ scale: 1.02 }}
+           whileTap={{ scale: 0.98 }}
+           onClick={() => {
+              playSound('click');
+              navigate('/');
+              (window as any).phaserGame?.scene.stop('HUDScene');
+              (window as any).phaserGame?.scene.stop('DialogScene');
+              (window as any).phaserGame?.scene.stop('GameScene');
+              (window as any).phaserGame?.scene.start('MenuScene');
+           }}
+           className="w-full py-4 rounded-lg bg-red-600/20 text-red-400 border-2 border-red-500/50 hover:bg-red-500 hover:text-white font-mono font-bold text-lg transition-colors"
+        >
+          SAIR PARA MENU
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+}

@@ -133,24 +133,8 @@ export class MenuScene extends Phaser.Scene {
     }).setOrigin(0.5);
     subTitle.setShadow(2, 2, '#2c3e50', 0, false, true);
 
-    // ── Buttons (positioned above hospital silhouette)
-    const btnY = 310;
-    const btnSpacing = 72;
-
-    this.createButton(cx, btnY, 'NOVO JOGO', 0x1abc9c, 0x16a085, () => {
-      clearSave();
-      this.startGame();
-    });
-
-    if (hasSave()) {
-      this.createButton(cx, btnY + btnSpacing, 'CONTINUAR', 0x9b59b6, 0x8e44ad, () => {
-        this.startGame();
-      });
-    }
-
-    this.createButton(cx, btnY + btnSpacing * (hasSave() ? 2 : 1), 'COMO JOGAR', 0xe67e22, 0xd35400, () => {
-      this.showHelp();
-    });
+    // ── Buttons (handled by React UI now) ──
+    // We keep the logic for startGame but remove Phaser buttons so React can handle the interaction and transitions.
 
     // ── Credits line
     this.add.text(cx, GAME_HEIGHT - 24, 'Baseado em: Kurcgant (2016) · Marquis & Huston (2015) · COFEN', {

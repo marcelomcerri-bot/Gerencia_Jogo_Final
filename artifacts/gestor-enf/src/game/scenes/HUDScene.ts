@@ -10,6 +10,8 @@ const MM_H = MAP_ROWS * MM_SCALE;
 const MM_X = GAME_WIDTH - 12 - MM_W;
 const MM_Y = 12;
 
+import { playSound } from '../utils/audio';
+
 export class HUDScene extends Phaser.Scene {
   // Time / shift
   private timeText!: Phaser.GameObjects.Text;
@@ -195,14 +197,15 @@ export class HUDScene extends Phaser.Scene {
       secBg5.fillStyle(0x152840, 1);
       secBg5.fillRoundedRect(bx + 730, by + 7, missionW - 16, barH - 14, 8);
 
-      this.add.text(bx + 738, by + 14, '📋 MISSÃO ATIVA', {
+      this.add.text(bx + 738, by + 12, '📋 MISSÃO ATIVA', {
         fontFamily: 'monospace', fontSize: '10px', color: '#1abc9c',
       });
 
-      this.missionText = this.add.text(bx + 738, by + 32, '', {
+      this.missionText = this.add.text(bx + 738, by + 28, '', {
         fontFamily: "'VT323', monospace", fontSize: '18px', color: '#1abc9c',
         wordWrap: { width: missionW - 32 },
-        lineSpacing: 0,
+        maxLines: 2,
+        lineSpacing: -2,
       });
     } else {
       // Fallback if not enough space
@@ -234,6 +237,28 @@ export class HUDScene extends Phaser.Scene {
   }
 
   // ── UPDATE HANDLERS ───────────────────────────────────────────────────────
+  private onRoomChange(roomName: string) {
+    if (!roomName) return;
+    this.roomLabel.setText(roomName);
+    const w = this.roomLabel.width + 40;
+    this.roomLabelBg.clear();
+    this.roomLabelBg.fillStyle(0x0a1628, 0.9);
+    this.roomLabelBg.fillRoundedRect(GAME_WIDTH / 2 - w / 2, 95, w, 40, 10);
+    this.roomLabelBg.lineStyle(2, 0x3498db, 0.8);
+    this.roomLabelBg.strokeRoundedRect(GAME_WIDTH / 2 - w / 2, 95, w, 40, 10);
+
+    this.tweens.killTweensOf([this.roomLabel, this.roomLabelBg]);
+    this.roomLabel.setAlpha(1);
+    this.roomLabelBg.setAlpha(1);
+
+    this.tweens.add({
+      targets: [this.roomLabel, this.roomLabelBg],
+      alpha: 0,
+      delay: 2500,
+      duration: 1000,
+    });
+  }
+
   private onHudUpdate(data: { state: GameState; playerX: number; playerY: number; activeMission?: string }) {
     const { state, playerX, playerY, activeMission } = data;
 
@@ -303,30 +328,253 @@ export class HUDScene extends Phaser.Scene {
     this.hintText.setText(msg);
   }
 
-  private onRoomChange(roomName: string) {
-    this.tweens.killTweensOf([this.roomLabel, this.roomLabelBg]);
+  public showCrisisOverlay(event: CrisisEvent, resolveCallback: (idx: number) => void) {
+    if (this.crisisOverlay) return;
 
-    this.roomLabel.setText(roomName);
-    const tw = this.roomLabel.width + 48;
+    playSound('pulse');
 
-    this.roomLabelBg.clear();
-    this.roomLabelBg.fillStyle(0x0a1628, 0.95);
-    this.roomLabelBg.fillRoundedRect(GAME_WIDTH / 2 - tw / 2, 100, tw, 36, 12);
-    this.roomLabelBg.lineStyle(3, 0x1abc9c, 1);
-    this.roomLabelBg.strokeRoundedRect(GAME_WIDTH / 2 - tw / 2, 100, tw, 36, 12);
+    const W = this.scale.width, H = this.scale.height;
+    const panelW = 680, panelH = 420;
 
-    this.roomLabelBg.setY(-40).setAlpha(0);
-    this.roomLabel.setY(80).setAlpha(0);
+    const container = this.add.container(W / 2, H / 2).setDepth(500);
 
+    // Dimmer
+    const dimmer = this.add.rectangle(0, 0, W * 2, H * 2, 0x000000, 0.7).setInteractive().setDepth(499);
+
+    // Panel bg
+    const shadow = this.add.graphics();
+    shadow.fillStyle(0x000000, 0.5);
+    shadow.fillRoundedRect(-panelW / 2 + 8, -panelH / 2 + 8, panelW, panelH, 16);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(event.urgent ? 0x1a0505 : 0x0a1a2e, 1);
+    bg.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16);
+    bg.lineStyle(4, event.urgent ? 0xe74c3c : 0xf39c12, 1);
+    bg.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16);
+
+    if (event.urgent) {
+      this.tweens.add({ targets: bg, alpha: 0.85, duration: 300, yoyo: true, repeat: 5 });
+    }
+
+    const titleText = this.add.text(0, -panelH / 2 + 30, event.title, {
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: '13px',
+      color: event.urgent ? '#ff6b6b' : '#f39c12',
+      wordWrap: { width: panelW - 40 },
+      align: 'center',
+    }).setOrigin(0.5);
+
+    const desc = this.add.text(0, -panelH / 2 + 75, event.description, {
+      fontFamily: "'VT323', monospace",
+      fontSize: '22px',
+      color: '#ecf0f1',
+      wordWrap: { width: panelW - 60 },
+      align: 'center',
+    }).setOrigin(0.5);
+
+    const choiceItems: Phaser.GameObjects.GameObject[] = [];
+    const startY = -panelH / 2 + 145;
+    const btnH = 68;
+    const btnW = panelW - 60;
+
+    let isResolved = false;
+
+    event.choices.forEach((choice, idx) => {
+      const cy = startY + idx * (btnH + 8);
+
+      const btnBg = this.add.graphics();
+      btnBg.fillStyle(0x1e3a5f, 1);
+      btnBg.fillRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
+      btnBg.lineStyle(2, 0x3498db, 1);
+      btnBg.strokeRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
+
+      const numTxt = this.add.text(-btnW / 2 + 16, cy, `${idx + 1}`, {
+        fontFamily: "'Press Start 2P', monospace", fontSize: '13px', color: '#f39c12',
+      }).setOrigin(0, 0.5);
+
+      const choiceTxt = this.add.text(-btnW / 2 + 36, cy, choice.text, {
+        fontFamily: "'VT323', monospace", fontSize: '20px', color: '#ecf0f1',
+        wordWrap: { width: btnW - 50 }, lineSpacing: 2,
+      }).setOrigin(0, 0.5);
+
+      const zone = this.add.zone(-btnW / 2, cy - btnH / 2, btnW, btnH).setOrigin(0).setInteractive({ cursor: 'pointer' });
+
+      zone.on('pointerover', () => {
+        playSound('hover');
+        btnBg.clear().fillStyle(0x2563a8, 1).fillRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8)
+          .lineStyle(3, 0xf1c40f, 1).strokeRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
+      });
+
+      zone.on('pointerout', () => {
+        btnBg.clear().fillStyle(0x1e3a5f, 1).fillRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8)
+          .lineStyle(2, 0x3498db, 1).strokeRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
+      });
+
+      const onSelect = () => {
+        if (isResolved) return;
+        isResolved = true;
+        playSound('click');
+        container.getData('timerEvent')?.remove();
+        container.destroy();
+        dimmer.destroy();
+        this.crisisOverlay = null;
+        resolveCallback(idx);
+      };
+
+      zone.on('pointerdown', onSelect);
+      this.input.keyboard?.once(`keydown-${idx + 1}`, onSelect);
+
+      choiceItems.push(btnBg, numTxt, choiceTxt, zone);
+    });
+
+    const timerBg = this.add.graphics().fillStyle(0x2c3e50, 1)
+      .fillRoundedRect(-panelW / 2 + 20, panelH / 2 - 30, panelW - 40, 15, 7);
+    const timerFill = this.add.graphics();
+    const timerDur = 40000; // 40 seconds for all QTEs
+    let elapsed = 0;
+
+    const timerUpdate = () => {
+      elapsed += 200;
+      const pct = Math.max(0, 1 - elapsed / timerDur);
+      const col = pct > 0.5 ? 0x2ecc71 : pct > 0.25 ? 0xf39c12 : 0xe74c3c;
+      timerFill.clear().fillStyle(col, 1)
+        .fillRoundedRect(-panelW / 2 + 20, panelH / 2 - 30, (panelW - 40) * pct, 15, 7);
+      
+      if (pct === 0 && !isResolved) {
+        isResolved = true;
+        container.getData('timerEvent')?.remove();
+        container.destroy();
+        dimmer.destroy();
+        this.crisisOverlay = null;
+        resolveCallback(event.choices.length - 1);
+      }
+    };
+
+    const timerEvent = this.time.addEvent({ delay: 200, repeat: timerDur / 200, callback: timerUpdate });
+    container.add([shadow, bg, titleText, desc, ...choiceItems, timerBg, timerFill]);
+    container.setScale(0.9).setAlpha(0);
+    this.tweens.add({ targets: container, scale: 1, alpha: 1, duration: 250, ease: 'Back.easeOut' });
+    container.setData('timerEvent', timerEvent);
+    this.crisisOverlay = container;
+  }
+
+  public showCrisisFeedback(text: string, correct: boolean, pts: number) {
+    if (correct) playSound('success');
+    else playSound('error');
+
+    const W = this.scale.width, H = this.scale.height;
+    const fbW = 600, fbH = 140;
+    const fb = this.add.container(W / 2, H / 2 - 80).setDepth(501);
+
+    const bg = this.add.graphics().fillStyle(correct ? 0x0a2a1a : 0x2a0a0a, 1)
+      .fillRoundedRect(-fbW / 2, -fbH / 2, fbW, fbH, 12).lineStyle(3, correct ? 0x2ecc71 : 0xe74c3c, 1)
+      .strokeRoundedRect(-fbW / 2, -fbH / 2, fbW, fbH, 12);
+
+    const icon = this.add.text(-fbW / 2 + 30, 0, correct ? '✅' : '⚠️', { fontSize: '32px' }).setOrigin(0, 0.5);
+
+    const ptsSign = pts >= 0 ? '+' : '';
+    const ptsLabel = this.add.text(-fbW / 2 + 70, -fbH / 2 + 18,
+      `${correct ? 'CORRETO!' : 'ATENÇÃO!'} ${ptsSign}${pts} pts`, {
+        fontFamily: "'Press Start 2P', monospace", fontSize: '11px', color: correct ? '#2ecc71' : '#e74c3c',
+      });
+
+    const feedTxt = this.add.text(-fbW / 2 + 70, -fbH / 2 + 48, text, {
+      fontFamily: "'VT323', monospace", fontSize: '19px', color: '#ecf0f1', wordWrap: { width: fbW - 90 },
+    });
+
+    fb.add([bg, icon, ptsLabel, feedTxt]);
+    fb.setScale(0.9).setAlpha(0);
+    
     this.tweens.add({
-      targets: [this.roomLabelBg, this.roomLabel], y: '+=40', alpha: 1,
-      duration: 350, ease: 'Back.easeOut',
+      targets: fb, scale: 1, alpha: 1, duration: 250, ease: 'Back.easeOut',
       onComplete: () => {
         this.tweens.add({
-          targets: [this.roomLabelBg, this.roomLabel], alpha: 0, y: '-+=12',
-          duration: 500, delay: 2500,
+          targets: fb, alpha: 0, duration: 400, delay: 4000,
+          onComplete: () => fb.destroy()
         });
       },
     });
+  }
+
+  public toggleMissionOverlay(state: GameState) {
+    if (this.missionOverlay) {
+      playSound('click');
+      this.missionOverlay.destroy();
+      this.missionOverlay = null;
+      return;
+    }
+    
+    playSound('hover');
+
+    const W = this.scale.width, H = this.scale.height;
+    const panelW = 520, panelH = Math.min(560, H - 80);
+    const c = this.add.container(W / 2, H / 2).setDepth(300);
+
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0a0f1e, 0.97).fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16)
+      .lineStyle(3, 0x1abc9c, 1).strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16);
+
+    const title = this.add.text(0, -panelH / 2 + 22, '📋  MISSÕES  DO  HUAP', {
+      fontFamily: "'Press Start 2P', monospace", fontSize: '11px', color: '#1abc9c',
+    }).setOrigin(0.5);
+
+    const lvInfo = getLevelInfo(state.prestige);
+    const careerTxt = this.add.text(0, -panelH / 2 + 44,
+      `${lvInfo.title} · ⭐ ${state.prestige} pts`, {
+        fontFamily: "'VT323', monospace", fontSize: '19px', color: '#f1c40f',
+      }).setOrigin(0.5);
+
+    const closeBtn = this.add.text(panelW / 2 - 18, -panelH / 2 + 16, '✕', {
+      fontFamily: "'Press Start 2P', monospace", fontSize: '11px', color: '#e74c3c',
+    }).setInteractive({ cursor: 'pointer' })
+      .on('pointerdown', () => { playSound('click'); c.destroy(); this.missionOverlay = null; });
+
+    const items: Phaser.GameObjects.Text[] = [];
+    let y = -panelH / 2 + 68;
+
+    const categories = [...new Set(MISSIONS.map(m => m.category))];
+    for (const cat of categories) {
+      const catMissions = MISSIONS.filter(m => m.category === cat);
+      const catLabel = this.add.text(-panelW / 2 + 14, y, `── ${cat}`, {
+        fontFamily: "'Press Start 2P', monospace", fontSize: '8px', color: '#7f8c8d',
+      });
+      items.push(catLabel);
+      y += 16;
+
+      for (const m of catMissions) {
+        const done = state.completedMissions.includes(m.id);
+        const active = !!state.missionProgress[m.id] && !done;
+        const locked = !done && !active && m.prerequisiteIds.some(id => !state.completedMissions.includes(id));
+
+        const icon = done ? '✅' : active ? '▶' : locked ? '🔒' : '○';
+        const col = done ? '#2ecc71' : active ? '#f1c40f' : locked ? '#636e72' : '#bdc3c7';
+
+        const line = this.add.text(-panelW / 2 + 14, y, `${icon} ${m.title} (+${m.prestige}pts)`, {
+          fontFamily: "'VT323', monospace", fontSize: '17px', color: col,
+        });
+        items.push(line);
+        y += 19;
+      }
+      y += 4;
+    }
+
+    const done = state.completedMissions.length;
+    const total = MISSIONS.length;
+    const pct = (done / total * 100) | 0;
+
+    const prog = this.add.text(0, panelH / 2 - 22,
+      `Progresso: ${done}/${total} (${pct}%)  |  Stress: ${Math.floor(state.stress || 0)}%`, {
+        fontFamily: "'VT323', monospace", fontSize: '16px', color: '#bdc3c7',
+      }).setOrigin(0.5);
+
+    c.add([bg, title, careerTxt, closeBtn, ...items, prog]);
+    c.setScale(0.9).setAlpha(0);
+    this.tweens.add({ targets: c, scale: 1, alpha: 1, duration: 200, ease: 'Back.easeOut' });
+
+    this.input.keyboard?.once('keydown-M', () => {
+       if (this.missionOverlay) { playSound('click'); c.destroy(); this.missionOverlay = null; }
+    });
+
+    this.missionOverlay = c;
   }
 }

@@ -42,12 +42,6 @@ export class GameScene extends Phaser.Scene {
   private propColliders: Phaser.Physics.Arcade.StaticGroup | null = null;
   public interactionPoints: Array<{ x: number; y: number; type: 'work' | 'sit' | 'inspect' | 'rest' }> = [];
 
-  // Lighting overlay
-  private darkOverlay!: Phaser.GameObjects.RenderTexture;
-  private glowBrush!: Phaser.GameObjects.Sprite;
-  private additiveLightGroup!: Phaser.GameObjects.Group;
-  private lightPoints: Array<{ x: number, y: number, radius: number, intensity: number, color?: number }> = [];
-
   constructor() { super({ key: SCENES.GAME }); }
 
   create() {
@@ -63,8 +57,6 @@ export class GameScene extends Phaser.Scene {
     this.spawnNPCs();
     this.setupInput();
     this.setupCamera();
-    this.buildLighting();
-    this.createVignette();
 
     this.scene.launch(SCENES.HUD);
     this.cameras.main.fadeIn(700);
@@ -171,10 +163,6 @@ export class GameScene extends Phaser.Scene {
              this.drawBush(propsGfx, bx, by);
            }
         } else if (tid === TILE_ID.CORRIDOR) {
-           // Lights in corridor
-           if (c % 6 === 0 && r % 6 === 0) {
-              this.lightPoints.push({ x: bx + 16, y: by + 16, radius: 100, intensity: 0.3 });
-           }
            // Hand sanitizer on north walls
            if (this.mapData[r-1] && this.mapData[r-1][c] === TILE_ID.WALL && c % 4 === 0) {
               this.drawHandSanitizer(propsGfx, bx, by);
@@ -203,18 +191,6 @@ export class GameScene extends Phaser.Scene {
   private populateRoom(g: Phaser.GameObjects.Graphics, tid: number, r1: number, r2: number, c1: number, c2: number) {
     const w = c2 - c1 + 1;
     const h = r2 - r1 + 1;
-    
-    // Choose light color based on room
-    let roomColor = 0xffffff;
-    if (tid === TILE_ID.ICU || tid === TILE_ID.EMERGENCY) roomColor = 0xcceeff; // clinical blue
-    else if (tid === TILE_ID.WARD || tid === TILE_ID.MATERNITY) roomColor = 0xffeedd; // warm
-    else if (tid === TILE_ID.GARDEN) roomColor = 0xddffdd; // outdoor green
-    else if (tid === TILE_ID.RECEPTION || tid === TILE_ID.ADMIN) roomColor = 0xfffae6; // desk light
-
-    // Room center light
-    const cx = (c1 + w/2) * TILE_SIZE;
-    const cy = (r1 + h/2) * TILE_SIZE;
-    this.lightPoints.push({ x: cx, y: cy, radius: Math.max(w, h) * 20, intensity: 0.25, color: roomColor });
 
     for (let r = r1 + 1; r < r2; r += 2) {
       for (let c = c1 + 1; c < c2; c += 2) {
@@ -224,13 +200,11 @@ export class GameScene extends Phaser.Scene {
           if (c % 3 === 0) {
             this.drawHospitalBed(g, bx, by, tid === TILE_ID.ICU);
             this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
-            if (tid === TILE_ID.ICU) this.lightPoints.push({ x: bx+16, y: by+16, radius: 45, intensity: 0.35, color: 0xa8ffe3 }); // green monitor glow
           }
         } else if (tid === TILE_ID.ADMIN || tid === TILE_ID.RECEPTION) {
           if (c % 4 === 1 && r % 3 === 1) {
             this.drawOfficeDesk(g, bx, by);
             this.interactionPoints.push({ x: bx, y: by, type: 'work' });
-            this.lightPoints.push({ x: bx+16, y: by+16, radius: 60, intensity: 0.3, color: 0xaaccff }); // blue screen glow
           } else if (tid === TILE_ID.RECEPTION && c % 2 === 0 && r % 3 === 0) {
             this.drawWaitingChairs(g, bx, by);
             this.interactionPoints.push({ x: bx, y: by, type: 'sit' });
@@ -311,6 +285,13 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(hasMonitor ? 0x16a085 : 0x2980b9, 0.85); g.fillRoundedRect(bx + 5, by + 20, 22, 23, 2);
     // Pillow
     g.fillStyle(0xffffff, 1); g.fillRoundedRect(bx + 7, by + 7, 18, 10, 3);
+    
+    // Patient (Head) - occasionally absent, but mostly present
+    if (Math.random() < 0.8) {
+      g.fillStyle(0xf5c5a3, 1); // skin color
+      g.beginPath(); g.arc(bx + 16, by + 12, 6, 0, Math.PI * 2); g.fill();
+    }
+
     // Bedside table
     g.fillStyle(0x95a5a6, 1); g.fillRect(bx - 10, by + 4, 10, 12);
     
@@ -486,9 +467,13 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC).on('down', () => {
       if (this.isDialogOpen || this.isCrisisOpen) return;
       saveGame(this.state);
-      this.cameras.main.fadeOut(400, 0, 0, 0, (_c: unknown, p: number) => {
-        if (p === 1) this.scene.start(SCENES.MENU);
-      });
+      
+      // Navigate to Pause Menu via React and pause the scenes
+      if ((window as any).reactNavigate) {
+         (window as any).reactNavigate('/pause');
+         this.scene.pause('HUDScene');
+         this.scene.pause('GameScene');
+      }
     });
   }
 
@@ -498,21 +483,6 @@ export class GameScene extends Phaser.Scene {
       .startFollow(this.player, true, 0.08, 0.08)
       .setZoom(CAMERA_ZOOM)
       .setBounds(0, 0, MAP_COLS * TILE_SIZE, MAP_ROWS * TILE_SIZE);
-  }
-
-  // ─── VIGNETTE ─────────────────────────────────────────────────────────────
-  private createVignette() {
-    const W = this.scale.width, H = this.scale.height;
-    if (this.textures.exists('__vignette')) this.textures.remove('__vignette');
-    const ct = this.textures.createCanvas('__vignette', W, H) as Phaser.Textures.CanvasTexture;
-    const ctx = ct.getContext();
-    const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.25, W / 2, H / 2, H * 0.9);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(1, 'rgba(0,0,0,0.5)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-    ct.refresh();
-    this.add.image(W / 2, H / 2, '__vignette').setDepth(100).setScrollFactor(0);
   }
 
   // ─── CRISIS SYSTEM ────────────────────────────────────────────────────────
@@ -533,154 +503,24 @@ export class GameScene extends Phaser.Scene {
     if (available.length === 0) { this.scheduleCrisis(); return; }
 
     const event = available[Phaser.Math.Between(0, available.length - 1)];
-    this.showCrisisOverlay(event);
+    
+    this.isCrisisOpen = true;
+    const hud = this.scene.get('HUDScene') as any;
+    if (hud) {
+      hud.showCrisisOverlay(event, (choiceIdx: number) => {
+        this.resolveCrisis(event, choiceIdx);
+      });
+    }
+
     this.state.crisisCount = (this.state.crisisCount || 0) + 1;
     this.scheduleCrisis();
   }
 
-  private showCrisisOverlay(event: CrisisEvent) {
-    this.isCrisisOpen = true;
-
-    const W = this.scale.width, H = this.scale.height;
-    const panelW = 680, panelH = 420;
-
-    const container = this.add.container(W / 2, H / 2).setDepth(500).setScrollFactor(0);
-
-    // Dimmer
-    const dimmer = this.add.rectangle(0, 0, W * 2, H * 2, 0x000000, 0.7).setScrollFactor(0).setDepth(499);
-
-    // Panel bg
-    const shadow = this.add.graphics();
-    shadow.fillStyle(0x000000, 0.5);
-    shadow.fillRoundedRect(-panelW / 2 + 8, -panelH / 2 + 8, panelW, panelH, 16);
-
-    const bg = this.add.graphics();
-    bg.fillStyle(event.urgent ? 0x1a0505 : 0x0a1a2e, 1);
-    bg.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16);
-    bg.lineStyle(4, event.urgent ? 0xe74c3c : 0xf39c12, 1);
-    bg.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16);
-
-    // Urgent pulse effect
-    if (event.urgent) {
-      this.tweens.add({
-        targets: bg, alpha: 0.85, duration: 300, yoyo: true, repeat: 5,
-      });
-    }
-
-    // Title
-    const titleText = this.add.text(0, -panelH / 2 + 30, event.title, {
-      fontFamily: "'Press Start 2P', monospace",
-      fontSize: '13px',
-      color: event.urgent ? '#ff6b6b' : '#f39c12',
-      wordWrap: { width: panelW - 40 },
-      align: 'center',
-    }).setOrigin(0.5);
-
-    // Description
-    const desc = this.add.text(0, -panelH / 2 + 75, event.description, {
-      fontFamily: "'VT323', monospace",
-      fontSize: '22px',
-      color: '#ecf0f1',
-      wordWrap: { width: panelW - 60 },
-      align: 'center',
-    }).setOrigin(0.5);
-
-    // Choices
-    const choiceItems: Phaser.GameObjects.GameObject[] = [];
-    const startY = -panelH / 2 + 145;
-    const btnH = 68;
-    const btnW = panelW - 60;
-
-    event.choices.forEach((choice, idx) => {
-      const cy = startY + idx * (btnH + 8);
-
-      const btnBg = this.add.graphics();
-      btnBg.fillStyle(0x1e3a5f, 1);
-      btnBg.fillRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
-      btnBg.lineStyle(2, 0x3498db, 1);
-      btnBg.strokeRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
-
-      const numTxt = this.add.text(-btnW / 2 + 16, cy, `${idx + 1}`, {
-        fontFamily: "'Press Start 2P', monospace",
-        fontSize: '13px',
-        color: '#f39c12',
-      }).setOrigin(0, 0.5);
-
-      const choiceTxt = this.add.text(-btnW / 2 + 36, cy, choice.text, {
-        fontFamily: "'VT323', monospace",
-        fontSize: '20px',
-        color: '#ecf0f1',
-        wordWrap: { width: btnW - 50 },
-        lineSpacing: 2,
-      }).setOrigin(0, 0.5);
-
-      // Interactive zone
-      const zone = this.add.zone(-btnW / 2, cy - btnH / 2, btnW, btnH).setOrigin(0)
-        .setInteractive({ cursor: 'pointer' });
-
-      zone.on('pointerover', () => {
-        btnBg.clear();
-        btnBg.fillStyle(0x2563a8, 1);
-        btnBg.fillRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
-        btnBg.lineStyle(3, 0xf1c40f, 1);
-        btnBg.strokeRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
-      });
-
-      zone.on('pointerout', () => {
-        btnBg.clear();
-        btnBg.fillStyle(0x1e3a5f, 1);
-        btnBg.fillRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
-        btnBg.lineStyle(2, 0x3498db, 1);
-        btnBg.strokeRoundedRect(-btnW / 2, cy - btnH / 2, btnW, btnH, 8);
-      });
-
-      zone.on('pointerdown', () => this.resolveCrisis(event, idx, container, dimmer));
-      this.input.keyboard?.once(`keydown-${idx + 1}`, () => this.resolveCrisis(event, idx, container, dimmer));
-
-      choiceItems.push(btnBg, numTxt, choiceTxt, zone);
-    });
-
-    // Countdown timer bar
-    const timerBg = this.add.graphics();
-    timerBg.fillStyle(0x2c3e50, 1);
-    timerBg.fillRoundedRect(-panelW / 2 + 20, panelH / 2 - 30, panelW - 40, 15, 7);
-
-    const timerFill = this.add.graphics();
-    const timerDur = event.urgent ? 15000 : 25000;
-    let elapsed = 0;
-
-    const timerUpdate = () => {
-      elapsed += 200;
-      const pct = Math.max(0, 1 - elapsed / timerDur);
-      const col = pct > 0.5 ? 0x2ecc71 : pct > 0.25 ? 0xf39c12 : 0xe74c3c;
-      timerFill.clear();
-      timerFill.fillStyle(col, 1);
-      timerFill.fillRoundedRect(-panelW / 2 + 20, panelH / 2 - 30, (panelW - 40) * pct, 15, 7);
-      if (pct === 0 && this.isCrisisOpen) {
-        // Auto-resolve with worst choice on timeout
-        this.resolveCrisis(event, event.choices.length - 1, container, dimmer);
-      }
-    };
-
-    const timerEvent = this.time.addEvent({ delay: 200, repeat: timerDur / 200, callback: timerUpdate });
-
-    container.add([shadow, bg, titleText, desc, ...choiceItems, timerBg, timerFill]);
-
-    // Animate in
-    container.setScale(0.9).setAlpha(0);
-    this.tweens.add({ targets: container, scale: 1, alpha: 1, duration: 250, ease: 'Back.easeOut' });
-
-    container.setData('timerEvent', timerEvent);
-    this.crisisOverlay = container;
-  }
-
-  private resolveCrisis(event: CrisisEvent, choiceIdx: number, container: Phaser.GameObjects.Container, dimmer: Phaser.GameObjects.Rectangle) {
+  public resolveCrisis(event: CrisisEvent, choiceIdx: number) {
     if (!this.isCrisisOpen) return;
     this.isCrisisOpen = false;
 
     const choice = event.choices[choiceIdx];
-    const timerEv = container.getData('timerEvent') as Phaser.Time.TimerEvent;
-    timerEv?.remove();
 
     // Apply effects
     this.state.prestige = Math.max(0, this.state.prestige + choice.prestigeEffect);
@@ -688,59 +528,14 @@ export class GameScene extends Phaser.Scene {
     this.state.stress = Math.max(0, Math.min(100, (this.state.stress || 0) + choice.stressEffect));
     this.state.decisionLog = [...(this.state.decisionLog || []), `${event.id}:${choiceIdx}`].slice(-20);
 
-    // Show feedback panel
-    this.showCrisisFeedback(choice.feedback, choice.correct, choice.prestigeEffect, container, dimmer);
-  }
-
-  private showCrisisFeedback(text: string, correct: boolean, pts: number, crisisContainer: Phaser.GameObjects.Container, dimmer: Phaser.GameObjects.Rectangle) {
-    // Remove crisis panel
-    this.tweens.add({
-      targets: crisisContainer, alpha: 0, y: crisisContainer.y - 20, duration: 200,
-      onComplete: () => crisisContainer.destroy(),
-    });
-
-    const W = this.scale.width, H = this.scale.height;
-    const fbW = 600, fbH = 140;
-    const fb = this.add.container(W / 2, H / 2 - 80).setDepth(501).setScrollFactor(0);
-
-    const bg = this.add.graphics();
-    bg.fillStyle(correct ? 0x0a2a1a : 0x2a0a0a, 1);
-    bg.fillRoundedRect(-fbW / 2, -fbH / 2, fbW, fbH, 12);
-    bg.lineStyle(3, correct ? 0x2ecc71 : 0xe74c3c, 1);
-    bg.strokeRoundedRect(-fbW / 2, -fbH / 2, fbW, fbH, 12);
-
-    const icon = this.add.text(-fbW / 2 + 30, 0, correct ? '✅' : '⚠️', { fontSize: '32px' }).setOrigin(0, 0.5);
-
-    const ptsSign = pts >= 0 ? '+' : '';
-    const ptsLabel = this.add.text(-fbW / 2 + 70, -fbH / 2 + 18,
-      `${correct ? 'CORRETO!' : 'ATENÇÃO!'} ${ptsSign}${pts} pts`, {
-        fontFamily: "'Press Start 2P', monospace",
-        fontSize: '11px',
-        color: correct ? '#2ecc71' : '#e74c3c',
-      });
-
-    const feedTxt = this.add.text(-fbW / 2 + 70, -fbH / 2 + 48, text, {
-      fontFamily: "'VT323', monospace",
-      fontSize: '19px',
-      color: '#ecf0f1',
-      wordWrap: { width: fbW - 90 },
-    });
-
-    fb.add([bg, icon, ptsLabel, feedTxt]);
-    fb.setScale(0.9).setAlpha(0);
-    this.tweens.add({
-      targets: fb, scale: 1, alpha: 1, duration: 250, ease: 'Back.easeOut',
-      onComplete: () => {
-        this.tweens.add({
-          targets: [fb, dimmer], alpha: 0, duration: 400, delay: 4000,
-          onComplete: () => { fb.destroy(); dimmer.destroy(); this.crisisOverlay = null; },
-        });
-      },
-    });
+    const hud = this.scene.get('HUDScene') as any;
+    if (hud) {
+       hud.showCrisisFeedback(choice.feedback, choice.correct, choice.prestigeEffect);
+    }
 
     // Show prestige change
-    const colorStr = pts >= 0 ? '#2ecc71' : '#e74c3c';
-    this.showFloatingText(this.player.x, this.player.y - 40, `${pts >= 0 ? '+' : ''}${pts} pts`, colorStr, 28);
+    const colorStr = choice.prestigeEffect >= 0 ? '#2ecc71' : '#e74c3c';
+    this.showFloatingText(this.player.x, this.player.y - 40, `${choice.prestigeEffect >= 0 ? '+' : ''}${choice.prestigeEffect} pts`, colorStr, 28);
     this.emitHudUpdate();
   }
 
@@ -841,59 +636,11 @@ export class GameScene extends Phaser.Scene {
       if (roomName) this.events.emit(EV.ROOM_CHANGE, roomName);
     }
 
-    // Update Lighting
-    this.updateLighting();
-
     // HUD update (throttled)
     if (time - this.lastHudEmit > 300) {
       this.lastHudEmit = time;
       this.emitHudUpdate();
     }
-  }
-
-  private updateLighting() {
-    const cam = this.cameras.main;
-    const w = this.scale.width;
-    const h = this.scale.height;
-    
-    // Fill the screen with semi-transparent dark blue/black
-    this.darkOverlay.clear();
-    this.darkOverlay.fill(0x0a101f, 0.90);
-
-    const px = this.player.x - cam.worldView.x;
-    const py = this.player.y - cam.worldView.y;
-
-    // Clear previous frame's additive lights
-    this.additiveLightGroup.clear(true, true);
-
-    // Use glow brush to erase light spots extremely fast natively
-    const drawLight = (lx: number, ly: number, targetRadius: number, intensity: number, color?: number) => {
-      // Glow texture is 256x256, so base radius is 128
-      const scale = targetRadius / 128;
-      this.glowBrush.setScale(scale);
-      this.glowBrush.setAlpha(intensity);
-      this.glowBrush.setPosition(lx, ly);
-      this.darkOverlay.erase(this.glowBrush);
-
-      // If it's a colored light, add an additive Sprite to physically tint the room in the world
-      if (color !== undefined) {
-         const cl = this.additiveLightGroup.create(lx + cam.worldView.x, ly + cam.worldView.y, 'light_glow') as Phaser.GameObjects.Sprite;
-         cl.setScale(scale).setTint(color).setAlpha(intensity * 0.45).setBlendMode(Phaser.BlendModes.ADD).setDepth(89);
-      }
-    };
-
-    // Static lights
-    for (const lp of this.lightPoints) {
-       const lx = lp.x - cam.worldView.x;
-       const ly = lp.y - cam.worldView.y;
-       // Only draw if on screen
-       if (lx > -lp.radius && lx < w + lp.radius && ly > -lp.radius && ly < h + lp.radius) {
-         drawLight(lx, ly, lp.radius, lp.intensity, lp.color);
-       }
-    }
-
-    // Player light
-    drawLight(px, py, 140, 1);
   }
 
   // ─── HELPERS ──────────────────────────────────────────────────────────────
@@ -939,87 +686,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private toggleMissionOverlay() {
-    if (this.missionOverlay) { this.missionOverlay.destroy(); this.missionOverlay = null; return; }
-
-    const W = this.scale.width, H = this.scale.height;
-    const panelW = 520, panelH = Math.min(560, H - 80);
-    const c = this.add.container(W / 2, H / 2).setDepth(300).setScrollFactor(0);
-
-    const bg = this.add.graphics();
-    bg.fillStyle(0x0a0f1e, 0.97);
-    bg.fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16);
-    bg.lineStyle(3, 0x1abc9c, 1);
-    bg.strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16);
-
-    const title = this.add.text(0, -panelH / 2 + 22, '📋  MISSÕES  DO  HUAP', {
-      fontFamily: "'Press Start 2P', monospace",
-      fontSize: '11px',
-      color: '#1abc9c',
-    }).setOrigin(0.5);
-
-    const lvInfo = getLevelInfo(this.state.prestige);
-    const careerTxt = this.add.text(0, -panelH / 2 + 44,
-      `${lvInfo.title} · ⭐ ${this.state.prestige} pts`, {
-        fontFamily: "'VT323', monospace",
-        fontSize: '19px',
-        color: '#f1c40f',
-      }).setOrigin(0.5);
-
-    const closeBtn = this.add.text(panelW / 2 - 18, -panelH / 2 + 16, '✕', {
-      fontFamily: "'Press Start 2P', monospace",
-      fontSize: '11px',
-      color: '#e74c3c',
-    }).setInteractive({ cursor: 'pointer' })
-      .on('pointerdown', () => { c.destroy(); this.missionOverlay = null; });
-
-    const items: Phaser.GameObjects.Text[] = [];
-    let y = -panelH / 2 + 68;
-
-    // Group by category
-    const categories = [...new Set(MISSIONS.map(m => m.category))];
-    for (const cat of categories) {
-      const catMissions = MISSIONS.filter(m => m.category === cat);
-      const catLabel = this.add.text(-panelW / 2 + 14, y, `── ${cat}`, {
-        fontFamily: "'Press Start 2P', monospace",
-        fontSize: '8px',
-        color: '#7f8c8d',
-      });
-      items.push(catLabel);
-      y += 16;
-
-      for (const m of catMissions) {
-        const done = this.state.completedMissions.includes(m.id);
-        const active = !!this.state.missionProgress[m.id] && !done;
-        const locked = !done && !active && m.prerequisiteIds.some(id => !this.state.completedMissions.includes(id));
-
-        const icon = done ? '✅' : active ? '▶' : locked ? '🔒' : '○';
-        const col = done ? '#2ecc71' : active ? '#f1c40f' : locked ? '#636e72' : '#bdc3c7';
-
-        const line = this.add.text(-panelW / 2 + 14, y, `${icon} ${m.title} (+${m.prestige}pts)`, {
-          fontFamily: "'VT323', monospace",
-          fontSize: '17px',
-          color: col,
-        });
-        items.push(line);
-        y += 19;
-      }
-      y += 4;
+    const hud = this.scene.get('HUDScene') as any;
+    if (hud) {
+      hud.toggleMissionOverlay(this.state);
     }
-
-    const done = this.state.completedMissions.length;
-    const total = MISSIONS.length;
-    const pct = (done / total * 100) | 0;
-
-    const prog = this.add.text(0, panelH / 2 - 22,
-      `Progresso: ${done}/${total} (${pct}%)  |  Stress: ${Math.floor(this.state.stress || 0)}%`, {
-        fontFamily: "'VT323', monospace",
-        fontSize: '16px',
-        color: '#bdc3c7',
-      }).setOrigin(0.5);
-
-    c.add([bg, title, careerTxt, closeBtn, ...items, prog]);
-    this.mKey.once('down', () => { c.destroy(); this.missionOverlay = null; });
-    this.missionOverlay = c;
   }
 
   private emitHudUpdate() {

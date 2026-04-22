@@ -183,11 +183,11 @@ export class BootScene extends Phaser.Scene {
     // Legs / Pants
     ctx.fillStyle = c.coatDark; // Use darker tone for trousers/scrubs
     if (isLR) {
-      ctx.fillRect(cx - 6, 26 + bob + legA + oy, 8, 20);
-      ctx.fillRect(cx + 1, 26 + bob + legB + oy, 8, 20);
+      rrFill(ctx, cx - 6 + facing * legA, 26 + bob + oy, 8, 20, 2);
+      rrFill(ctx, cx + 1 - facing * legA, 26 + bob + oy, 8, 20, 2);
     } else {
-      ctx.fillRect(cx - 10, 26 + bob + oy, 8, 20);
-      ctx.fillRect(cx + 2, 26 + bob + oy, 8, 20);
+      rrFill(ctx, cx - 10, 26 + bob + legA + oy, 8, 20, 2);
+      rrFill(ctx, cx + 2, 26 + bob + legB + oy, 8, 20, 2);
     }
 
     // Torso / Scrub Top
@@ -250,11 +250,11 @@ export class BootScene extends Phaser.Scene {
       ctx.fillRect(cx - 16, 26 + bob + armA + oy, 8, 3);
       ctx.fillRect(cx + 9, 26 + bob - armA + oy, 8, 3);
     } else {
-      rrFill(ctx, cx - 16, 13 + bob + oy, 7, 16, 3.5);
-      rrFill(ctx, cx + 9, 13 + bob + oy, 7, 16, 3.5);
+      rrFill(ctx, cx - 16, 13 + bob + armA + oy, 7, 16, 3.5);
+      rrFill(ctx, cx + 9, 13 + bob - armA + oy, 7, 16, 3.5);
       ctx.fillStyle = 'rgba(0,0,0,0.1)';
-      ctx.fillRect(cx - 16, 26 + bob + oy, 7, 3);
-      ctx.fillRect(cx + 9, 26 + bob + oy, 7, 3);
+      ctx.fillRect(cx - 16, 26 + bob + armA + oy, 7, 3);
+      ctx.fillRect(cx + 9, 26 + bob - armA + oy, 7, 3);
     }
 
     // Clipboard (admin)

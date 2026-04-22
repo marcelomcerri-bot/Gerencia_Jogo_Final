@@ -1531,6 +1531,57 @@ export const NPC_DEFS: NPCDef[] = [
       },
     ],
   },
+  {
+    id: 'paciente_uti_1',
+    name: 'Sr. João',
+    title: 'Paciente (UTI)',
+    role: 'other',
+    spriteKey: 'npc_patient_1',
+    startCol: 44, startRow: 24,
+    bodyColor: 0xe0f2fe, coatColor: 0x95a5a6, hairColor: 0xd3d3d3, skinColor: 0xf5c5a3,
+    patrolPoints: [{ col: 44, row: 24 }],  // Doesn't move, in bed
+    schedule: [{ hour: 0, col: 44, row: 24 }],
+    missionIds: [],
+    dialogues: [{
+      id: 'idle',
+      text: ['(Bip... bip... bip...)', 'Agradeço pelo cuidado... estou me sentindo mais seguro.'],
+      choices: [{ text: 'Pode descansar.'}]
+    }]
+  },
+  {
+    id: 'paciente_enf_1',
+    name: 'Dona Maria',
+    title: 'Paciente (Enfermaria)',
+    role: 'other',
+    spriteKey: 'npc_patient_2',
+    startCol: 36, startRow: 18,
+    bodyColor: 0xe0f2fe, coatColor: 0x95a5a6, hairColor: 0x6e2c00, skinColor: 0xd4a574,
+    patrolPoints: [{ col: 36, row: 18 }],  // Doesn't move
+    schedule: [{ hour: 0, col: 36, row: 18 }],
+    missionIds: [],
+    dialogues: [{
+      id: 'idle',
+      text: ['Sabe se o médico vai passar hoje?', 'O almoço do hospital até que não está ruim.'],
+      choices: [{ text: 'O médico já deve passar, Dona Maria.'}]
+    }]
+  },
+  {
+    id: 'visitante_1',
+    name: 'Roberto',
+    title: 'Visitante (Recepção)',
+    role: 'other',
+    spriteKey: 'npc_patient_3',
+    startCol: 6, startRow: 11,
+    bodyColor: 0xffffff, coatColor: 0xc0392b, hairColor: 0x111111, skinColor: 0x8d6e63,
+    patrolPoints: [{ col: 6, row: 11 }, { col: 10, row: 11 }, { col: 8, row: 9 }],
+    schedule: [{ hour: 9, col: 6, row: 11 }],
+    missionIds: [],
+    dialogues: [{
+      id: 'idle',
+      text: ['Bom dia, eu queria informações sobre a internação.', 'A senhora poderia me ajudar?'],
+      choices: [{ text: 'Claro, por favor se dirija à recepção.'}]
+    }]
+  }
 ];
 
 // ─── MISSION DEFINITIONS ──────────────────────────────────────────────────────
