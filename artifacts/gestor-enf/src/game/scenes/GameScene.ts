@@ -539,16 +539,35 @@ export class GameScene extends Phaser.Scene {
     this.emitHudUpdate();
   }
 
+
+  private getVPad() {
+    const hud = this.scene.get('HUDScene') as any;
+    return hud?.virtualPad || { up: false, down: false, left: false, right: false, sprint: false, actionJustPressed: false, missionJustPressed: false, menuJustPressed: false };
+  }
+
   // ─── UPDATE ───────────────────────────────────────────────────────────────
   update(time: number, delta: number) {
-    if (this.isDialogOpen || this.isCrisisOpen) return;
+    const vpad = this.getVPad();
+
+    // Check menu key early (even if dialog/crisis is open, though pause usually blocks this, let's keep it safe)
+    if (Phaser.Input.Keyboard.JustDown(this.escKey) || vpad.menuJustPressed) {
+      if (vpad.menuJustPressed) vpad.menuJustPressed = false;
+      this.pauseGame();
+    }
+
+    if (this.isDialogOpen || this.isCrisisOpen) {
+       // if dialogue is open, maybe they press action to advance it?
+       // The DialogScene handles its own input. But we should reset action just in case.
+       if (vpad.actionJustPressed) vpad.actionJustPressed = false;
+       return;
+    }
 
     // Movement
-    const up    = this.cursors.up.isDown    || this.wasd.up.isDown;
-    const down  = this.cursors.down.isDown  || this.wasd.down.isDown;
-    const left  = this.cursors.left.isDown  || this.wasd.left.isDown;
-    const right = this.cursors.right.isDown || this.wasd.right.isDown;
-    const sprint = this.shiftKey.isDown && this.state.energy > 10;
+    const up    = this.cursors.up.isDown    || this.wasd.up.isDown || vpad.up;
+    const down  = this.cursors.down.isDown  || this.wasd.down.isDown || vpad.down;
+    const left  = this.cursors.left.isDown  || this.wasd.left.isDown || vpad.left;
+    const right = this.cursors.right.isDown || this.wasd.right.isDown || vpad.right;
+    const sprint = (this.shiftKey.isDown || vpad.sprint) && this.state.energy > 10;
     this.player.move(up, down, left, right, delta, sprint);
 
     // NPC AI update
@@ -558,12 +577,16 @@ export class GameScene extends Phaser.Scene {
     this.detectNearbyNPC();
 
     // Interaction
-    if (Phaser.Input.Keyboard.JustDown(this.eKey) && this.nearbyNPC) {
+    if ((Phaser.Input.Keyboard.JustDown(this.eKey) || vpad.actionJustPressed) && this.nearbyNPC) {
+      if (vpad.actionJustPressed) vpad.actionJustPressed = false;
       this.openDialog(this.nearbyNPC);
+    } else {
+       if (vpad.actionJustPressed) vpad.actionJustPressed = false;
     }
 
     // Mission overlay toggle
-    if (Phaser.Input.Keyboard.JustDown(this.mKey)) {
+    if (Phaser.Input.Keyboard.JustDown(this.mKey) || vpad.missionJustPressed) {
+      if (vpad.missionJustPressed) vpad.missionJustPressed = false;
       this.toggleMissionOverlay();
     }
 

@@ -1,7 +1,6 @@
 import { HashRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Play, RotateCcw, BookOpen } from "lucide-react";
 import { hasSave, clearSave } from "../game/utils/save";
 import { playSound } from "../game/utils/audio";
 
@@ -57,9 +56,9 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
                   onStartGame();
                   navigate('/game');
                 }}
-                className="flex items-center justify-center gap-3 bg-gradient-to-r from-purple-700 to-indigo-500 text-white px-8 py-5 rounded-xl shadow-lg shadow-purple-500/20 border border-purple-400 font-mono tracking-widest text-lg font-bold"
+                className="flex items-center justify-center gap-3 bg-indigo-500 text-white px-8 py-4 rounded-xl shadow-[0_4px_0_#312e81] border-2 border-white font-['Press_Start_2P',_monospace] tracking-widest text-sm hover:bg-indigo-400"
               >
-                <Play size={24} /> CONTINUAR
+                CONTINUAR
               </motion.button>
             )}
 
@@ -73,9 +72,9 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
                 onStartGame();
                 navigate('/game');
               }}
-              className="flex items-center justify-center gap-3 bg-gradient-to-r from-teal-600 to-emerald-400 text-white px-8 py-5 rounded-xl shadow-lg shadow-teal-500/20 border border-teal-300 font-mono tracking-widest text-lg font-bold"
+              className="flex items-center justify-center gap-3 bg-[#1abc9c] text-white px-8 py-4 rounded-xl shadow-[0_4px_0_#0e6252] border-2 border-white font-['Press_Start_2P',_monospace] tracking-widest text-sm hover:bg-[#1dd2af]"
             >
-              <RotateCcw size={24} /> NOVO JOGO
+              NOVO JOGO
             </motion.button>
 
             <motion.button 
@@ -86,9 +85,9 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
                 playSound('click');
                 setShowHelp(true);
               }}
-              className="flex items-center justify-center gap-3 bg-gradient-to-r from-slate-800 to-slate-700 text-slate-200 px-8 py-5 rounded-xl shadow-lg shadow-slate-900/40 border border-slate-600 font-mono tracking-widest text-lg"
+              className="flex items-center justify-center gap-3 bg-[#f39c12] text-white px-8 py-4 rounded-xl shadow-[0_4px_0_#a66705] border-2 border-white font-['Press_Start_2P',_monospace] tracking-widest text-sm hover:bg-[#f4a62a]"
             >
-              <BookOpen size={20} /> COMO JOGAR
+              COMO JOGAR
             </motion.button>
           </div>
         ) : (

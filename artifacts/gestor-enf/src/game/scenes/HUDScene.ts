@@ -46,6 +46,9 @@ export class HUDScene extends Phaser.Scene {
 
   // Alert banner
   private alertBanner: Phaser.GameObjects.Container | null = null;
+  
+  // Mobile Controls
+  public virtualPad = { up: false, down: false, left: false, right: false, sprint: false, actionJustPressed: false, missionJustPressed: false, menuJustPressed: false };
 
   constructor() { super({ key: SCENES.HUD, active: false }); }
 
@@ -56,10 +59,80 @@ export class HUDScene extends Phaser.Scene {
     this.buildBottomHint();
     this.buildRoomLabel();
 
+    if (!this.sys.game.device.os.desktop || window.innerWidth < 1000) {
+      this.buildMobileControls();
+    }
+
     const gameScene = this.scene.get(SCENES.GAME);
     gameScene.events.on(EVENTS.HUD_UPDATE, this.onHudUpdate, this);
     gameScene.events.on(EVENTS.INTERACTION_HINT, this.onHint, this);
     gameScene.events.on(EVENTS.ROOM_CHANGE, this.onRoomChange, this);
+  }
+
+  private buildMobileControls() {
+    const isMobile = true;
+    if (isMobile) {
+      this.hintText.setVisible(false); // Hide text hints on mobile
+    }
+
+    const padBaseX = 140;
+    const padBaseY = GAME_HEIGHT - 140;
+
+    // Helper to create a D-pad button
+    const createBtn = (x: number, y: number, w: number, h: number, key: 'up'|'down'|'left'|'right'|'sprint', label: string) => {
+      const zone = this.add.zone(x, y, w, h).setOrigin(0.5).setInteractive();
+      const bg = this.add.graphics();
+      bg.fillStyle(0x0a1628, 0.7);
+      bg.fillRoundedRect(x - w/2, y - h/2, w, h, 10);
+      bg.lineStyle(2, 0x1abc9c, 0.5);
+      bg.strokeRoundedRect(x - w/2, y - h/2, w, h, 10);
+      
+      const txt = this.add.text(x, y, label, { fontFamily: 'monospace', fontSize: '24px', fontStyle: 'bold', color: '#1abc9c' }).setOrigin(0.5);
+
+      zone.on('pointerdown', () => { this.virtualPad[key] = true; bg.clear().fillStyle(0x1abc9c, 0.7).fillRoundedRect(x - w/2, y - h/2, w, h, 10); txt.setColor('#ffffff'); });
+      const unpress = () => { this.virtualPad[key] = false; bg.clear().fillStyle(0x0a1628, 0.7).fillRoundedRect(x - w/2, y - h/2, w, h, 10); bg.lineStyle(2, 0x1abc9c, 0.5).strokeRoundedRect(x - w/2, y - h/2, w, h, 10); txt.setColor('#1abc9c'); };
+      zone.on('pointerup', unpress);
+      zone.on('pointerout', unpress);
+    };
+
+    createBtn(padBaseX, padBaseY - 80, 60, 60, 'up', 'W');
+    createBtn(padBaseX, padBaseY + 80, 60, 60, 'down', 'S');
+    createBtn(padBaseX - 80, padBaseY, 60, 60, 'left', 'A');
+    createBtn(padBaseX + 80, padBaseY, 60, 60, 'right', 'D');
+
+    // Run Button
+    createBtn(padBaseX + 160, padBaseY + 80, 80, 60, 'sprint', 'RUN');
+
+    // Action Buttons
+    const actionBaseX = GAME_WIDTH - 140;
+    
+    const createFireBtn = (x: number, y: number, r: number, key: 'actionJustPressed'|'missionJustPressed'|'menuJustPressed', label: string, color: number) => {
+      const zone = this.add.zone(x, y, r*2, r*2).setCircular().setOrigin(0.5).setInteractive();
+      const bg = this.add.graphics();
+      bg.fillStyle(0x0a1628, 0.7);
+      bg.fillCircle(x, y, r);
+      bg.lineStyle(3, color, 0.7);
+      bg.strokeCircle(x, y, r);
+      
+      const txt = this.add.text(x, y, label, { fontFamily: 'monospace', fontSize: '20px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5);
+
+      zone.on('pointerdown', () => { 
+        this.virtualPad[key] = true; 
+        // Auto reset false to simulate "JustPressed" after 1 frame, but for now we'll check it in GameScene and reset it there
+        bg.clear().fillStyle(color, 0.7).fillCircle(x, y, r); 
+      });
+      const unpress = () => { 
+        this.virtualPad[key] = false; 
+        bg.clear().fillStyle(0x0a1628, 0.7).fillCircle(x, y, r); 
+        bg.lineStyle(3, color, 0.7).strokeCircle(x, y, r); 
+      };
+      zone.on('pointerup', unpress);
+      zone.on('pointerout', unpress);
+    };
+
+    createFireBtn(actionBaseX, padBaseY, 40, 'actionJustPressed', 'FALAR', 0xf39c12);
+    createFireBtn(actionBaseX - 90, padBaseY + 60, 35, 'missionJustPressed', 'MISSÃO', 0x9b59b6);
+    createFireBtn(actionBaseX - 30, padBaseY - 80, 35, 'menuJustPressed', 'PAUSA', 0xe74c3c);
   }
 
   // ── MINIMAP ───────────────────────────────────────────────────────────────
