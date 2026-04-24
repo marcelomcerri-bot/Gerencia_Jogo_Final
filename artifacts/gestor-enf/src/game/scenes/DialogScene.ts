@@ -343,12 +343,11 @@ export class DialogScene extends Phaser.Scene {
     this.choiceArea.removeAll(true);
     this.choiceButtons = [];
     
-    // Choose appropriate feedback line based on prestige logic or generic
-    const isGood = (choice.prestigeEffect || 0) >= 0;
+    // Choose appropriate feedback line
     const isMission = !!choice.missionEffect;
     const actionType = choice.missionEffect ? choice.missionEffect.split(':')[1] : null;
     
-    let feedbackText = choice.feedback || (isMission && actionType === 'complete' ? "Muito bem. Concluímos a tarefa." : (isGood ? "Certo, entendi." : "Não concordo muito, mas faremos assim."));
+    let feedbackText = (choice as any).feedback || (isMission && actionType === 'complete' ? "Muito bem. Concluímos a tarefa." : (isMission ? "Pode contar comigo." : "Certo, entendi."));
 
     this.lines = [feedbackText];
     this.startLine(0);

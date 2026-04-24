@@ -1,7 +1,7 @@
 import * as Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, SCENES, EVENTS, MAP_COLS, MAP_ROWS, TILE_SIZE, CAREER_LEVELS } from '../constants';
-import { getLevelInfo } from '../data/gameData';
-import type { GameState } from '../data/gameData';
+import { getLevelInfo, MISSIONS } from '../data/gameData';
+import type { GameState, CrisisEvent } from '../data/gameData';
 import { generateMapTiles, ROOM_FLOOR_COLORS_HUD } from './HUDMinimapHelper';
 
 const MM_SCALE = 3;
@@ -44,8 +44,10 @@ export class HUDScene extends Phaser.Scene {
   private roomLabel!: Phaser.GameObjects.Text;
   private roomLabelBg!: Phaser.GameObjects.Graphics;
 
-  // Alert banner
+  // Overlays
   private alertBanner: Phaser.GameObjects.Container | null = null;
+  private crisisOverlay: Phaser.GameObjects.Container | null = null;
+  private missionOverlay: Phaser.GameObjects.Container | null = null;
   
   // Mobile Controls
   public virtualPad = { up: false, down: false, left: false, right: false, sprint: false, actionJustPressed: false, missionJustPressed: false, menuJustPressed: false };
@@ -107,7 +109,9 @@ export class HUDScene extends Phaser.Scene {
     const actionBaseX = GAME_WIDTH - 140;
     
     const createFireBtn = (x: number, y: number, r: number, key: 'actionJustPressed'|'missionJustPressed'|'menuJustPressed', label: string, color: number) => {
-      const zone = this.add.zone(x, y, r*2, r*2).setCircular().setOrigin(0.5).setInteractive();
+      const zone = this.add.zone(x, y, r*2, r*2).setOrigin(0.5);
+      zone.setInteractive(new Phaser.Geom.Circle(r, r, r), Phaser.Geom.Circle.Contains);
+      
       const bg = this.add.graphics();
       bg.fillStyle(0x0a1628, 0.7);
       bg.fillCircle(x, y, r);

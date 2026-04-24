@@ -21,15 +21,14 @@ export class GameScene extends Phaser.Scene {
   private shiftKey!: Phaser.Input.Keyboard.Key;
   private eKey!: Phaser.Input.Keyboard.Key;
   private mKey!: Phaser.Input.Keyboard.Key;
+  private escKey!: Phaser.Input.Keyboard.Key;
 
   private timeAccum = 0;
   private currentRoom: number = TILE_ID.CORRIDOR;
   private nearbyNPC: NPC | null = null;
   private isDialogOpen = false;
   private isCrisisOpen = false;
-  private missionOverlay: Phaser.GameObjects.Container | null = null;
-  private crisisOverlay: Phaser.GameObjects.Container | null = null;
-
+  
   private energyTimer = 0;
   private energyRestoreTimer = 0;
   private stressDecayTimer = 0;
@@ -38,6 +37,10 @@ export class GameScene extends Phaser.Scene {
   private nextCrisisTime = 0;
 
   // Ambient lights/decor
+  private darkOverlay!: Phaser.GameObjects.RenderTexture;
+  private glowBrush!: Phaser.GameObjects.Sprite;
+  private additiveLightGroup!: Phaser.GameObjects.Group;
+  
   private ambientGfx!: Phaser.GameObjects.Graphics;
   private propColliders: Phaser.Physics.Arcade.StaticGroup | null = null;
   public interactionPoints: Array<{ x: number; y: number; type: 'work' | 'sit' | 'inspect' | 'rest' }> = [];
@@ -463,18 +466,22 @@ export class GameScene extends Phaser.Scene {
     };
     this.shiftKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
     this.eKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.mKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.M);
+    this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
-    this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC).on('down', () => {
-      if (this.isDialogOpen || this.isCrisisOpen) return;
-      saveGame(this.state);
-      
-      // Navigate to Pause Menu via React and pause the scenes
-      if ((window as any).reactNavigate) {
-         (window as any).reactNavigate('/pause');
-         this.scene.pause('HUDScene');
-         this.scene.pause('GameScene');
-      }
-    });
+    this.escKey.on('down', () => this.pauseGame());
+  }
+
+  public pauseGame() {
+    if (this.isDialogOpen || this.isCrisisOpen) return;
+    saveGame(this.state);
+    
+    // Navigate to Pause Menu via React and pause the scenes
+    if ((window as any).reactNavigate) {
+       (window as any).reactNavigate('/pause');
+       this.scene.pause('HUDScene');
+       this.scene.pause('GameScene');
+    }
   }
 
   // ─── CAMERA ───────────────────────────────────────────────────────────────
