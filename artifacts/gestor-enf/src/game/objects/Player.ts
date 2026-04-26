@@ -16,8 +16,9 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(10);
     this.setCollideWorldBounds(true);
     const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setSize(20, 20);
-    body.setOffset(12, 42);
+    // Tight feet-only body so the character doesn't snag on door jambs / props
+    body.setSize(16, 14);
+    body.setOffset(14, 46);
     this.setFrame(0);
   }
 

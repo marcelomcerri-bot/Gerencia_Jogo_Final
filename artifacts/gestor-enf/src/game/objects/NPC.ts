@@ -20,6 +20,12 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
   private interactionBubble: Phaser.GameObjects.Text | null = null;
   private interactionBubbleTimer = 0;
 
+  // ── Stuck recovery
+  private lastX = 0;
+  private lastY = 0;
+  private stuckTimer = 0;
+  private readonly STUCK_THRESHOLD = 1500; // ms with no real progress -> consider stuck
+
   constructor(scene: Phaser.Scene, def: NPCDef) {
     const x = (def.startCol + 0.5) * TILE_SIZE;
     const y = (def.startRow + 0.5) * TILE_SIZE;
@@ -31,10 +37,14 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(10);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
-    body.setSize(20, 20);
-    body.setOffset(12, 42);
+    // Tight feet-only body: keeps NPCs from snagging on door jambs and props
+    body.setSize(16, 14);
+    body.setOffset(14, 46);
     body.setImmovable(false);
     this.setFrame(0);
+
+    this.lastX = x;
+    this.lastY = y;
 
     // Name label with role color
     const roleColors: Record<string, string> = {
@@ -121,7 +131,23 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     const dx = tx - this.x, dy = ty - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist < 4) {
+    // Stuck recovery: if NPC barely moves while trying to reach waypoint, skip to next
+    const movedDelta = Math.hypot(this.x - this.lastX, this.y - this.lastY);
+    if (movedDelta < 0.5 && dist > 12) {
+      this.stuckTimer += delta;
+      if (this.stuckTimer >= this.STUCK_THRESHOLD) {
+        this.stuckTimer = 0;
+        this.waypointIdx = (this.waypointIdx + 1) % this.def.patrolPoints.length;
+        this.lastX = this.x; this.lastY = this.y;
+        return;
+      }
+    } else {
+      this.stuckTimer = 0;
+    }
+    this.lastX = this.x;
+    this.lastY = this.y;
+
+    if (dist < 12) {
       (this.body as Phaser.Physics.Arcade.Body).setVelocity(0, 0);
       this.setPosition(tx, ty);
       this.isWaiting = true;

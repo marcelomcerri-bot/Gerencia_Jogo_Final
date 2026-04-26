@@ -507,7 +507,7 @@ export class HUDScene extends Phaser.Scene {
     const timerBg = this.add.graphics().fillStyle(0x2c3e50, 1)
       .fillRoundedRect(-panelW / 2 + 20, panelH / 2 - 30, panelW - 40, 15, 7);
     const timerFill = this.add.graphics();
-    const timerDur = 40000; // 40 seconds for all QTEs
+    const timerDur = 90000; // 90 seconds — gives players time to read and decide carefully
     let elapsed = 0;
 
     const timerUpdate = () => {

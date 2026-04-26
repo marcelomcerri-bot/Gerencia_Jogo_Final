@@ -1,364 +1,176 @@
 import * as Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, SCENES } from '../constants';
-import { hasSave, clearSave } from '../utils/save';
-
-const SKY_TOP    = 0x1a1a6e;
-const SKY_MID    = 0x6b35a3;
-const SKY_BOTTOM = 0xe8744a;
-const PEACH      = 0xffc67a;
-const TEAL_ACCENT = 0x1abc9c;
-const WHITE = 0xffffff;
 
 export class MenuScene extends Phaser.Scene {
   constructor() { super({ key: SCENES.MENU }); }
 
   create() {
     const cx = GAME_WIDTH / 2;
-    const cy = GAME_HEIGHT / 2;
 
-    // ── Background gradient (Canvas API — works in both WebGL and Canvas mode)
-    if (this.textures.exists('__menu_bg')) this.textures.remove('__menu_bg');
-    if (this.textures.exists('__menu_hz')) this.textures.remove('__menu_hz');
-    const bgCanvas = this.textures.createCanvas('__menu_bg', GAME_WIDTH, GAME_HEIGHT) as Phaser.Textures.CanvasTexture;
-    const bgCtx = bgCanvas.getContext();
-    const grad = bgCtx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
-    grad.addColorStop(0,    '#0d0d3f');  // deep midnight blue
-    grad.addColorStop(0.35, '#3b1f6e');  // dark purple
-    grad.addColorStop(0.6,  '#8e3a8c');  // warm magenta-purple
-    grad.addColorStop(0.8,  '#e8744a');  // warm sunset orange
-    grad.addColorStop(1,    '#ffc67a');  // peach horizon
-    bgCtx.fillStyle = grad;
-    bgCtx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    bgCanvas.refresh();
-    this.add.image(GAME_WIDTH / 2, GAME_HEIGHT / 2, '__menu_bg');
-
-    // ── Stars
-    for (let i = 0; i < 50; i++) {
-      const x = Phaser.Math.Between(0, GAME_WIDTH);
-      const y = Phaser.Math.Between(0, GAME_HEIGHT / 2);
-      const star = this.add.circle(x, y, Phaser.Math.FloatBetween(0.5, 1.5), 0xffffff, Phaser.Math.FloatBetween(0.2, 0.8));
+    // ── Background: real HUAP/UFF photo (cover-fit, with subtle pan)
+    if (this.textures.exists('huap_photo')) {
+      const tex = this.textures.get('huap_photo').getSourceImage() as HTMLImageElement;
+      const iw = tex.width || 1280;
+      const ih = tex.height || 720;
+      // cover-fit: scale to fill the canvas, keep aspect
+      const scale = Math.max(GAME_WIDTH / iw, GAME_HEIGHT / ih) * 1.05;
+      const photo = this.add.image(cx, GAME_HEIGHT / 2, 'huap_photo')
+        .setOrigin(0.5)
+        .setScale(scale)
+        .setDepth(0);
+      // Subtle Ken-Burns style pan
       this.tweens.add({
-        targets: star,
-        alpha: 0,
-        duration: Phaser.Math.Between(1000, 3000),
+        targets: photo,
+        scale: scale * 1.06,
+        duration: 12000,
         yoyo: true,
         repeat: -1,
-        delay: Phaser.Math.Between(0, 2000)
+        ease: 'Sine.easeInOut',
       });
+    } else {
+      // Fallback: solid hospital-blue background
+      this.add.rectangle(cx, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x0a1628).setDepth(0);
     }
 
-    // ── Sun/Moon
-    const sun = this.add.circle(GAME_WIDTH - 200, 200, 60, 0xffeaa7, 0.9);
-    const sunGlow = this.add.circle(GAME_WIDTH - 200, 200, 80, 0xffeaa7, 0.3);
-    this.tweens.add({
-      targets: sunGlow,
-      scale: 1.2,
-      alpha: 0.1,
-      duration: 3000,
-      yoyo: true,
-      repeat: -1
-    });
-
-    // ── Clouds
-    for (let i = 0; i < 4; i++) {
-      const g = this.add.graphics({ fillStyle: { color: 0xffffff, alpha: 0.2 } });
-      g.fillEllipse(0, 0, 100, 30);
-      g.fillEllipse(-30, 10, 80, 25);
-      g.fillEllipse(30, 5, 70, 20);
-      const cloud = this.add.container(Phaser.Math.Between(-100, GAME_WIDTH), Phaser.Math.Between(50, 250), [g]);
-      this.tweens.add({
-        targets: cloud,
-        x: GAME_WIDTH + 150,
-        duration: Phaser.Math.Between(30000, 50000),
-        repeat: -1,
-        onRepeat: () => { cloud.x = -150; }
-      });
+    // ── Top dim gradient (improves title legibility)
+    const topDim = this.textures.createCanvas('__menu_top_dim', GAME_WIDTH, 320) as Phaser.Textures.CanvasTexture;
+    if (topDim) {
+      const tctx = topDim.getContext();
+      const tg = tctx.createLinearGradient(0, 0, 0, 320);
+      tg.addColorStop(0, 'rgba(8, 22, 40, 0.92)');
+      tg.addColorStop(1, 'rgba(8, 22, 40, 0)');
+      tctx.fillStyle = tg;
+      tctx.fillRect(0, 0, GAME_WIDTH, 320);
+      topDim.refresh();
+      this.add.image(GAME_WIDTH / 2, 160, '__menu_top_dim').setDepth(1);
     }
 
-    // ── Horizon glow (warm haze behind hospital — Canvas API)
-    const hzCanvas = this.textures.createCanvas('__menu_hz', GAME_WIDTH, 160) as Phaser.Textures.CanvasTexture;
-    const hzCtx = hzCanvas.getContext();
-    const hzGrad = hzCtx.createLinearGradient(0, 0, 0, 160);
-    hzGrad.addColorStop(0, 'rgba(255,198,122,0.0)');
-    hzGrad.addColorStop(0.3, 'rgba(232,116,74,0.6)');
-    hzGrad.addColorStop(1, 'rgba(10,0,20,0.0)');
-    hzCtx.fillStyle = hzGrad;
-    hzCtx.fillRect(0, 0, GAME_WIDTH, 160);
-    hzCanvas.refresh();
-    this.add.image(GAME_WIDTH / 2, GAME_HEIGHT * 0.55 + 40, '__menu_hz');
-
-    // ── Hospital silhouette (bottom section, below buttons)
-    this.drawHospitalSilhouette(cx, 630);
-
-    // ── Decorative Plants at bottom
-    this.drawPlants();
-
-    // ── Animated floor grid lines
-    const gridGfx = this.add.graphics();
-    const GRID = 64;
-    for (let x = 0; x < GAME_WIDTH; x += GRID) {
-      gridGfx.lineStyle(1, 0xffffff, 0.05);
-      gridGfx.lineBetween(x, GAME_HEIGHT - 200, x, GAME_HEIGHT);
-    }
-    for (let y = GAME_HEIGHT - 200; y < GAME_HEIGHT; y += GRID/2) {
-      gridGfx.lineStyle(1, 0xffffff, 0.05);
-      gridGfx.lineBetween(0, y, GAME_WIDTH, y);
+    // ── Bottom dim gradient (improves credits legibility & button contrast)
+    const botDim = this.textures.createCanvas('__menu_bot_dim', GAME_WIDTH, 280) as Phaser.Textures.CanvasTexture;
+    if (botDim) {
+      const bctx = botDim.getContext();
+      const bg = bctx.createLinearGradient(0, 0, 0, 280);
+      bg.addColorStop(0, 'rgba(8, 22, 40, 0)');
+      bg.addColorStop(1, 'rgba(8, 22, 40, 0.95)');
+      bctx.fillStyle = bg;
+      bctx.fillRect(0, 0, GAME_WIDTH, 280);
+      botDim.refresh();
+      this.add.image(GAME_WIDTH / 2, GAME_HEIGHT - 140, '__menu_bot_dim').setDepth(1);
     }
 
-    // ── Particle cross symbols (medical)
-    this.createMedicalParticles();
+    // ── Hospital identification badge (top-left)
+    const badgeBg = this.add.graphics().setDepth(2);
+    badgeBg.fillStyle(0x0a1628, 0.85);
+    badgeBg.fillRoundedRect(20, 20, 300, 56, 10);
+    badgeBg.lineStyle(2, 0x1abc9c, 0.9);
+    badgeBg.strokeRoundedRect(20, 20, 300, 56, 10);
+
+    this.add.text(36, 30, 'HOSPITAL UNIVERSITÁRIO', {
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: '10px',
+      color: '#1abc9c',
+    }).setDepth(3);
+    this.add.text(36, 50, 'ANTÔNIO PEDRO  ·  HUAP / UFF', {
+      fontFamily: "'VT323', monospace",
+      fontSize: '20px',
+      color: '#ecf0f1',
+    }).setDepth(3);
 
     // ── TITLE
-    const titleText = this.add.text(cx, 150, 'GESTOR ENF', {
+    const titleText = this.add.text(cx, 110, 'GESTOR ENF', {
       fontFamily: "'Press Start 2P', monospace",
-      fontSize: '56px',
+      fontSize: '52px',
       color: '#fff9e6',
-    }).setOrigin(0.5);
-    titleText.setShadow(4, 4, '#d35400', 0, false, true);
-    
-    // Title floating animation
+    }).setOrigin(0.5).setDepth(3);
+    titleText.setShadow(4, 4, '#000', 4, true, true);
+
     this.tweens.add({
       targets: titleText,
-      y: 140,
-      duration: 2000,
+      y: 100,
+      duration: 2400,
       yoyo: true,
       repeat: -1,
-      ease: 'Sine.easeInOut'
+      ease: 'Sine.easeInOut',
     });
 
-    const subTitle = this.add.text(cx, 210, 'GERÊNCIA HOSPITALAR 2D', {
+    const subTitle = this.add.text(cx, 168, 'GERÊNCIA HOSPITALAR  ·  RPG EDUCATIVO 2D', {
       fontFamily: "'Press Start 2P', monospace",
-      fontSize: '16px',
+      fontSize: '13px',
       color: '#1abc9c',
-    }).setOrigin(0.5);
-    subTitle.setShadow(2, 2, '#2c3e50', 0, false, true);
+    }).setOrigin(0.5).setDepth(3);
+    subTitle.setShadow(2, 2, '#000', 3, true, true);
 
-    // ── Buttons (handled by React UI now) ──
-    // We keep the logic for startGame but remove Phaser buttons so React can handle the interaction and transitions.
+    // Decorative pulse cross (top-right)
+    const crossBg = this.add.graphics().setDepth(2);
+    crossBg.fillStyle(0xe74c3c, 0.85);
+    crossBg.fillRoundedRect(GAME_WIDTH - 76, 20, 56, 56, 10);
+    const crossSym = this.add.text(GAME_WIDTH - 48, 48, '+', {
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: '38px',
+      color: '#ffffff',
+    }).setOrigin(0.5).setDepth(3);
+    this.tweens.add({
+      targets: crossSym, scale: 1.15, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+    });
 
-    // ── Credits line
-    this.add.text(cx, GAME_HEIGHT - 24, 'Baseado em: Kurcgant (2016) · Marquis & Huston (2015) · COFEN', {
+    // ── Subtle medical particle ambience
+    this.createMedicalParticles();
+
+    // ── Credits
+    this.add.text(cx, GAME_HEIGHT - 40, 'Baseado em: Kurcgant (2016) · Marquis & Huston (2015) · COFEN', {
       fontFamily: "'VT323', monospace",
       fontSize: '18px',
       color: '#ffeaa7',
-    }).setOrigin(0.5).setShadow(1, 1, '#000', 2);
+    }).setOrigin(0.5).setShadow(1, 1, '#000', 2).setDepth(3);
 
-    // ── Version
-    this.add.text(GAME_WIDTH - 16, GAME_HEIGHT - 16, 'v3.0 HUAP', {
+    this.add.text(cx, GAME_HEIGHT - 18, 'Use os botões à direita para começar', {
+      fontFamily: "'VT323', monospace",
+      fontSize: '16px',
+      color: '#bdc3c7',
+    }).setOrigin(0.5).setShadow(1, 1, '#000', 2).setDepth(3);
+
+    // Version
+    this.add.text(GAME_WIDTH - 16, GAME_HEIGHT - 16, 'v3.1 HUAP', {
       fontFamily: "'VT323', monospace",
       fontSize: '18px',
       color: '#ffeaa7',
-    }).setOrigin(1, 1).setShadow(1, 1, '#000', 2);
+    }).setOrigin(1, 1).setShadow(1, 1, '#000', 2).setDepth(3);
 
     // Camera fade in
-    this.cameras.main.fadeIn(1000);
-  }
-
-  private drawHospitalSilhouette(cx: number, cy: number) {
-    const g = this.add.graphics();
-    const baseColor = 0x2c3e50;
-    
-    // Back buildings
-    g.fillStyle(0x34495e, 0.8);
-    g.fillRect(cx - 300, cy - 60, 150, 180);
-    g.fillRect(cx + 150, cy - 40, 120, 160);
-    
-    // Main building
-    g.fillStyle(baseColor);
-    g.fillRoundedRect(cx - 220, cy - 100, 440, 220, 8);
-    
-    // Tower
-    g.fillStyle(baseColor);
-    g.fillRoundedRect(cx - 50, cy - 180, 100, 100, 4);
-    
-    // Roof lines
-    g.fillStyle(0xe74c3c);
-    g.fillRect(cx - 230, cy - 100, 460, 12);
-    g.fillRect(cx - 60, cy - 180, 120, 8);
-
-    // Cross
-    g.fillStyle(0xe74c3c);
-    g.fillRoundedRect(cx - 12, cy - 160, 24, 60, 4);
-    g.fillRoundedRect(cx - 30, cy - 142, 60, 24, 4);
-    
-    // Windows
-    const windowCols = 8;
-    const windowRows = 3;
-    for (let r = 0; r < windowRows; r++) {
-      for (let c = 0; c < windowCols; c++) {
-        const wx = cx - 180 + c * 50;
-        const wy = cy - 50 + r * 40;
-        // Randomly lit windows
-        if (Math.random() > 0.3) {
-          g.fillStyle(0xf1c40f); // Lit
-          g.fillRoundedRect(wx, wy, 24, 28, 2);
-          g.fillStyle(0xffeaa7, 0.5);
-          g.fillRect(wx + 2, wy + 2, 8, 24); // Window reflection
-        } else {
-          g.fillStyle(0x1a252f); // Dark
-          g.fillRoundedRect(wx, wy, 24, 28, 2);
-        }
-      }
-    }
-  }
-
-  private drawPlants() {
-    const g = this.add.graphics();
-    g.fillStyle(0x27ae60);
-    for(let i=0; i<30; i++) {
-      const px = Math.random() * GAME_WIDTH;
-      const py = GAME_HEIGHT - Math.random() * 40;
-      g.fillCircle(px, py, Math.random() * 15 + 10);
-      g.fillStyle(0x2ecc71);
-      g.fillCircle(px-5, py-5, Math.random() * 10 + 5);
-      g.fillStyle(0x27ae60);
-    }
+    this.cameras.main.fadeIn(900);
   }
 
   private createMedicalParticles() {
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 12; i++) {
       const isHeart = Math.random() > 0.5;
       const char = isHeart ? '♥' : '+';
       const color = isHeart ? '#e74c3c' : '#1abc9c';
-      
+
       const p = this.add.text(
         Phaser.Math.Between(0, GAME_WIDTH),
-        Phaser.Math.Between(GAME_HEIGHT/2, GAME_HEIGHT),
+        Phaser.Math.Between(GAME_HEIGHT / 2, GAME_HEIGHT),
         char,
         {
           fontFamily: isHeart ? 'sans-serif' : "'Press Start 2P', monospace",
-          fontSize: Phaser.Math.Between(12, 24) + 'px',
-          color: color,
+          fontSize: Phaser.Math.Between(12, 22) + 'px',
+          color,
         }
-      ).setAlpha(0);
+      ).setAlpha(0).setDepth(2);
 
       this.tweens.add({
         targets: p,
-        y: '-=150',
+        y: '-=180',
         x: `+=${Phaser.Math.Between(-30, 30)}`,
-        alpha: { start: 0, from: Phaser.Math.FloatBetween(0.4, 0.8), to: 0 },
-        scale: { start: 0.5, to: 1.5 },
-        duration: Phaser.Math.Between(4000, 8000),
+        alpha: { start: 0, from: Phaser.Math.FloatBetween(0.3, 0.7), to: 0 },
+        scale: { start: 0.5, to: 1.4 },
+        duration: Phaser.Math.Between(5000, 9000),
         delay: Phaser.Math.Between(0, 4000),
         repeat: -1,
         onRepeat: () => {
-          p.setY(Phaser.Math.Between(GAME_HEIGHT/2 + 100, GAME_HEIGHT + 50));
+          p.setY(Phaser.Math.Between(GAME_HEIGHT / 2 + 100, GAME_HEIGHT + 50));
           p.setX(Phaser.Math.Between(0, GAME_WIDTH));
-        }
+        },
       });
     }
-  }
-
-  private createButton(
-    x: number, y: number, label: string,
-    color1: number, color2: number, callback: () => void
-  ) {
-    const W = 300, H = 54;
-    const container = this.add.container(x, y);
-
-    const shadow = this.add.graphics();
-    shadow.fillStyle(0x000000, 0.3);
-    shadow.fillRoundedRect(4, 4, W, H, 12);
-    shadow.setPosition(-W/2, -H/2);
-
-    const bg = this.add.graphics();
-    bg.fillStyle(color1, 1);
-    bg.fillRoundedRect(0, 0, W, H, 12);
-    // Top highlight strip
-    bg.fillStyle(0xffffff, 0.12);
-    bg.fillRoundedRect(0, 0, W, H * 0.45, 12);
-    bg.setPosition(-W/2, -H/2);
-
-    const border = this.add.graphics();
-    border.lineStyle(3, 0xffffff, 0.8);
-    border.strokeRoundedRect(0, 0, W, H, 12);
-    border.setPosition(-W/2, -H/2);
-
-    const txt = this.add.text(0, 0, label, {
-      fontFamily: "'Press Start 2P', monospace",
-      fontSize: '14px',
-      color: '#ffffff',
-    }).setOrigin(0.5);
-    txt.setShadow(2, 2, '#000', 0, false, true);
-
-    container.add([shadow, bg, border, txt]);
-    container.setSize(W, H).setInteractive({ cursor: 'pointer' });
-
-    container.on('pointerover', () => {
-      this.tweens.add({ targets: container, scale: 1.05, y: y - 4, duration: 150, ease: 'Back.easeOut' });
-      border.lineStyle(4, 0xffeaa7, 1);
-      border.strokeRoundedRect(0, 0, W, H, 12);
-    });
-
-    container.on('pointerout', () => {
-      this.tweens.add({ targets: container, scale: 1, y: y, duration: 150, ease: 'Back.easeOut' });
-      border.clear();
-      border.lineStyle(3, 0xffffff, 0.8);
-      border.strokeRoundedRect(0, 0, W, H, 12);
-    });
-
-    container.on('pointerdown', () => {
-      this.tweens.add({ targets: container, scale: 0.95, duration: 100, yoyo: true });
-      this.cameras.main.flash(200, 255, 255, 255, false);
-      this.time.delayedCall(150, callback);
-    });
-  }
-
-  private startGame() {
-    this.cameras.main.fadeOut(800, 0, 0, 0, (_cam: unknown, progress: number) => {
-      if (progress === 1) {
-        this.scene.start(SCENES.GAME);
-      }
-    });
-  }
-
-  private showHelp() {
-    const overlay = this.add.rectangle(
-      GAME_WIDTH / 2, GAME_HEIGHT / 2,
-      GAME_WIDTH, GAME_HEIGHT,
-      0x000000, 0.8
-    ).setDepth(50).setInteractive();
-
-    const panel = this.add.graphics().setDepth(51);
-    panel.fillStyle(0x34495e, 1);
-    panel.fillRoundedRect(GAME_WIDTH/2 - 300, GAME_HEIGHT/2 - 250, 600, 500, 16);
-    panel.lineStyle(4, 0x1abc9c, 1);
-    panel.strokeRoundedRect(GAME_WIDTH/2 - 300, GAME_HEIGHT/2 - 250, 600, 500, 16);
-
-    const helpText = [
-      'COMO JOGAR  —  HUAP/UFF',
-      '',
-      '🎮 WASD / Setas — Mover',
-      '🏃 SHIFT — Correr (consome energia)',
-      '💬 E — Falar com NPC / Interagir',
-      '📋 M — Ver missões e progresso',
-      '⏸️ ESC — Pausar / Voltar ao menu',
-      '',
-      'Explore o HUAP, fale com os profissionais',
-      'e complete missões para ganhar Prestígio.',
-      '',
-      '🚨 CRISES: Eventos aleatórios precisam de',
-      'decisão rápida — escolha com cuidado!',
-      '',
-      '⚡ Energia: descanse na Copa (+6/s)',
-      '😰 Estresse: reduza no jardim ou copa',
-      '',
-      'Feedback pedagógico baseado em:',
-      'Kurcgant · COFEN · ONA · OMS/PNSP',
-      '',
-      '  [ Clique para fechar ]',
-    ].join('\n');
-
-    const txt = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, helpText, {
-      fontFamily: "'VT323', monospace",
-      fontSize: '26px',
-      color: '#ffeaa7',
-      align: 'center',
-      lineSpacing: 8,
-    }).setOrigin(0.5).setDepth(52);
-
-    const close = () => { overlay.destroy(); panel.destroy(); txt.destroy(); };
-    overlay.on('pointerdown', close);
-    this.input.keyboard?.once('keydown-ESC', close);
   }
 }

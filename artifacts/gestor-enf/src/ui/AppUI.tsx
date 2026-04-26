@@ -41,11 +41,11 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-50 flex flex-col items-center justify-center pointer-events-none bg-gradient-to-t from-[#0a1628]/80 to-transparent"
+      className="absolute inset-0 z-50 pointer-events-none"
     >
         {/* We place interactive UI over the Phaser menu scene (which plays in bg) */}
         {!showHelp ? (
-          <div className="flex flex-col gap-4 pointer-events-auto w-80 pt-16">
+          <div className="absolute right-[8%] top-1/2 -translate-y-1/2 flex flex-col gap-4 pointer-events-auto w-80">
             {hasSave() && (
               <motion.button 
                 onMouseEnter={() => playSound('hover')}
@@ -94,7 +94,7 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="pointer-events-auto bg-[#0a1628]/95 border-4 border-teal-500 rounded-2xl p-8 max-w-lg w-full shadow-2xl flex flex-col items-center gap-6"
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto bg-[#0a1628]/95 border-4 border-teal-500 rounded-2xl p-8 max-w-lg w-full shadow-2xl flex flex-col items-center gap-6"
           >
             <h2 className="text-2xl font-mono text-teal-400 font-bold">COMO JOGAR — HUAP/UFF</h2>
             <div className="text-teal-50 font-mono text-sm space-y-2 text-center">

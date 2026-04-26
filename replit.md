@@ -55,3 +55,11 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - Vignette overlay via canvas radial gradient
 - Polished HUD with rounded containers, animated player dot, energy bar
 - Dialog box with pattern portrait background, choice buttons, pedagogic note popup
+
+### v3.1 — Bug-Fix Pass (2026-04-26)
+- **Tailwind**: added missing `@import "tailwindcss"` in `src/index.css` (without it the menu buttons rendered invisible).
+- **Cover photo**: `BootScene` now preloads `public/assets/huap.png` (copied from `attached_assets/image_1777241237948.png`); `MenuScene` was rewritten to display this real HUAP/UFF facade with cover-fit + Ken-Burns pan, top/bottom dim gradients, hospital ID badge, and decorative pulse cross.
+- **Menu UI**: removed `pt-16` and `justify-center` from `AppUI`; the menu buttons are now anchored to the right-center (`right-[8%] top-1/2 -translate-y-1/2`), and the help panel is centered absolutely.
+- **QTE**: `HUDScene` crisis timer extended from 40s → 90s for readability.
+- **Walking & stuck NPCs**: `Player` and `NPC` physics bodies were tightened to feet-only (`16×14` at offset `14,46`) so characters no longer snag on door jambs/props. NPC `update()` now uses a 12px waypoint tolerance (was 4) and a 1500ms stuck-recovery that auto-skips a waypoint when the NPC barely moves.
+- **Dialog feedback**: replaced the generic `"Pode contar comigo"` / `"Certo, entendi"` fallbacks in `DialogScene` with role-aware feedback pools (doctor, nurse, technician, admin, receptionist, other) for `start` / `complete` / `idle` outcomes.

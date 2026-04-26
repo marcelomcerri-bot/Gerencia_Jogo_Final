@@ -343,11 +343,51 @@ export class DialogScene extends Phaser.Scene {
     this.choiceArea.removeAll(true);
     this.choiceButtons = [];
     
-    // Choose appropriate feedback line
+    // Choose appropriate feedback line — role-aware so it never feels generic
     const isMission = !!choice.missionEffect;
     const actionType = choice.missionEffect ? choice.missionEffect.split(':')[1] : null;
-    
-    let feedbackText = (choice as any).feedback || (isMission && actionType === 'complete' ? "Muito bem. Concluímos a tarefa." : (isMission ? "Pode contar comigo." : "Certo, entendi."));
+    const role = (this.npcDef as any).role as string | undefined;
+
+    const fallbackByRole: Record<string, { start: string[]; complete: string[]; idle: string[] }> = {
+      doctor: {
+        start: ['Conto com a sua liderança, enfermeira.', 'Ótima decisão clínica. Vamos alinhar com a equipe médica.'],
+        complete: ['Excelente desfecho — protocolo conduzido com rigor técnico.', 'Resultado bem documentado. A equipe médica agradece.'],
+        idle: ['Combinado. Qualquer intercorrência, me chame.', 'Perfeito, sigo confiante no plantão.'],
+      },
+      nurse: {
+        start: ['Vou repassar para a equipe na próxima passagem de plantão.', 'Combinado! Já registro no livro de ocorrências.'],
+        complete: ['Atividade concluída e anotada na evolução de enfermagem.', 'Pronto. Equipe alinhada e processo padronizado.'],
+        idle: ['Combinado, gerente.', 'Qualquer coisa, eu sinalizo no posto.'],
+      },
+      technician: {
+        start: ['Pode deixar comigo — vou alinhar com a CME.', 'Vou cuidar disso ainda neste turno.'],
+        complete: ['Tudo certo, processo padronizado conforme RDC.', 'Material liberado dentro da norma. Obrigado!'],
+        idle: ['Tudo certo por aqui.', 'Posso seguir com as rotinas então.'],
+      },
+      admin: {
+        start: ['Excelente. Vou formalizar isso na próxima reunião do colegiado.', 'Ótimo, registro em ata e acompanho o indicador.'],
+        complete: ['Resultado registrado nos indicadores institucionais.', 'Decisão alinhada à governança hospitalar. Bom trabalho.'],
+        idle: ['Combinado.', 'Mantenha-me informada do progresso.'],
+      },
+      receptionist: {
+        start: ['Anotei aqui na recepção, vou acompanhar.', 'Pode deixar! Já encaminho conforme o fluxo.'],
+        complete: ['Pronto, fluxo de atendimento ajustado.', 'Tudo registrado no sistema do HUAP.'],
+        idle: ['Combinado.', 'Qualquer dúvida, é só chamar aqui na recepção.'],
+      },
+      other: {
+        start: ['Obrigada pela atenção, gerente.', 'Fico mais tranquila sabendo que vai resolver.'],
+        complete: ['Muito obrigada por tudo!', 'Faz diferença ter alguém atento ao nosso cuidado.'],
+        idle: ['Tá bem, obrigada.', 'Bom dia, viu?'],
+      },
+    };
+
+    const bucket = fallbackByRole[role || 'other'] || fallbackByRole.other;
+    const pool = isMission
+      ? (actionType === 'complete' ? bucket.complete : bucket.start)
+      : bucket.idle;
+    const pickFromPool = pool[Math.floor(Math.random() * pool.length)];
+
+    let feedbackText = (choice as any).feedback || pickFromPool;
 
     this.lines = [feedbackText];
     this.startLine(0);
