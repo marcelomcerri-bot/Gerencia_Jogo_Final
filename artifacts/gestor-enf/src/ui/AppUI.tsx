@@ -45,7 +45,7 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
     >
         {/* We place interactive UI over the Phaser menu scene (which plays in bg) */}
         {!showHelp ? (
-          <div className="absolute right-[8%] top-1/2 -translate-y-1/2 flex flex-col gap-4 pointer-events-auto w-80">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-4 pointer-events-auto w-80">
             {hasSave() && (
               <motion.button 
                 onMouseEnter={() => playSound('hover')}

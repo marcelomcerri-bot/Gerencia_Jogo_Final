@@ -2,9 +2,22 @@ import * as Phaser from 'phaser';
 import { GAME_WIDTH, GAME_HEIGHT, SCENES } from '../constants';
 
 export class MenuScene extends Phaser.Scene {
+  private starting = false;
+
   constructor() { super({ key: SCENES.MENU }); }
 
+  /** Called from React (AppUI -> App.handleStartGame) when the player presses NOVO JOGO / CONTINUAR. */
+  public startGame() {
+    if (this.starting) return;
+    this.starting = true;
+    this.cameras.main.fadeOut(500, 0, 0, 0);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.start(SCENES.GAME);
+    });
+  }
+
   create() {
+    this.starting = false;
     const cx = GAME_WIDTH / 2;
 
     // ── Background: real HUAP/UFF photo (cover-fit, with subtle pan)
