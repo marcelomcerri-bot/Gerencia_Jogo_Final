@@ -235,9 +235,149 @@ export class GameScene extends Phaser.Scene {
              this.drawChemoChair(g, bx, by);
              this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
            }
+        } else if (tid === TILE_ID.EMERGENCY) {
+           // Trauma stretchers along one wall, defibrillator near entrance
+           if (c % 3 === 0 && r % 2 === 0) {
+             this.drawTraumaStretcher(g, bx, by);
+             this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
+           }
+           if (r === r1 + 1 && c === c1 + 1) {
+             this.drawDefibrillator(g, bx, by);
+             this.interactionPoints.push({ x: bx, y: by, type: 'work' });
+           }
+        } else if (tid === TILE_ID.RADIOLOGY) {
+           // One CT scanner centerpiece + supporting cabinets
+           if (r === r1 + 2 && c === c1 + 2) {
+             this.drawCTScanner(g, bx, by);
+             this.interactionPoints.push({ x: bx, y: by, type: 'work' });
+           } else if (r === r2 - 1 && c % 3 === 0) {
+             this.drawCabinet(g, bx, by);
+           }
+        } else if (tid === TILE_ID.NURSING) {
+           // Long counter desk + filing cabinets (the central nursing station)
+           if (r === r1 + 1 && c % 3 === 0) {
+             this.drawNursingDesk(g, bx, by);
+             this.interactionPoints.push({ x: bx, y: by, type: 'work' });
+           } else if (r === r2 - 1 && c % 3 === 0) {
+             this.drawFilingCabinet(g, bx, by);
+           }
+        } else if (tid === TILE_ID.OUTPATIENT) {
+           // Exam tables in a row with chairs scattered
+           if (c % 3 === 0 && r % 2 === 0) {
+             this.drawExamTable(g, bx, by);
+             this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
+           }
+           if (c === c2 - 1 && r === r1 + 1) this.drawPottedPlant(g, bx, by);
+        } else if (tid === TILE_ID.PSYCH) {
+           // Therapy sofa + plants for a calm atmosphere
+           if (r === r1 + 1 && c === c1 + 1) {
+             this.drawTherapySofa(g, bx, by);
+             this.interactionPoints.push({ x: bx, y: by, type: 'sit' });
+           } else if (c % 3 === 0 && r === r2 - 1) {
+             this.drawTherapyPlant(g, bx, by);
+           }
         }
       }
     }
+  }
+
+  private drawTraumaStretcher(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx + 2, by + 2, 28, 44);
+    g.fillStyle(0x000000, 0.2); g.fillRoundedRect(bx + 5, by + 5, 26, 42, 4);
+    g.fillStyle(0x95a5a6, 1); g.fillRoundedRect(bx + 3, by + 2, 26, 44, 3);
+    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx + 5, by + 5, 22, 38, 2);
+    g.fillStyle(0xc0392b, 0.9); g.fillRoundedRect(bx + 5, by + 18, 22, 25, 2); // red trauma blanket
+    g.fillStyle(0xffffff, 1); g.fillRoundedRect(bx + 7, by + 7, 18, 9, 3);
+    // IV pole
+    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx + 30, by - 4, 3, 28);
+    g.fillStyle(0xecf0f1, 0.9); g.fillRoundedRect(bx + 28, by - 10, 7, 12, 2);
+    // Wheels
+    g.fillStyle(0x2c3e50, 1);
+    g.fillCircle(bx + 6, by + 47, 2);
+    g.fillCircle(bx + 26, by + 47, 2);
+  }
+
+  private drawDefibrillator(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 24, 24);
+    g.fillStyle(0x000000, 0.25); g.fillRoundedRect(bx + 2, by + 2, 24, 24, 4);
+    g.fillStyle(0xf1c40f, 1); g.fillRoundedRect(bx, by, 24, 24, 4);
+    // Screen
+    g.fillStyle(0x2c3e50, 1); g.fillRoundedRect(bx + 4, by + 4, 16, 8, 2);
+    g.fillStyle(0x00ff88, 0.7); g.fillRect(bx + 6, by + 6, 12, 4);
+    // Heart icon
+    g.fillStyle(0xe74c3c, 1);
+    g.fillCircle(bx + 10, by + 17, 2);
+    g.fillCircle(bx + 14, by + 17, 2);
+    g.fillTriangle(bx + 8, by + 18, bx + 16, by + 18, bx + 12, by + 22);
+    // Status LED on lid
+    const led = this.add.sprite(bx + 21, by + 3, 'red_led').setDepth(3).setOrigin(0.5);
+    this.tweens.add({ targets: led, alpha: 0.2, duration: 700, yoyo: true, repeat: -1 });
+  }
+
+  private drawCTScanner(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 64, 32);
+    g.fillStyle(0x000000, 0.25); g.fillRoundedRect(bx + 4, by + 4, 64, 32, 8);
+    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx, by, 64, 32, 8); // housing
+    g.fillStyle(0xbdc3c7, 1); g.fillRoundedRect(bx + 4, by + 4, 56, 24, 6);
+    // Bore
+    g.fillStyle(0x2c3e50, 1); g.fillCircle(bx + 32, by + 16, 11);
+    g.fillStyle(0x1abc9c, 0.45); g.fillCircle(bx + 32, by + 16, 8);
+    g.fillStyle(0x16a085, 0.9); g.fillCircle(bx + 32, by + 16, 4);
+    // Patient table sliding out
+    g.fillStyle(0x95a5a6, 1); g.fillRect(bx + 24, by + 28, 16, 6);
+    // Branding stripe
+    g.fillStyle(0x3498db, 1); g.fillRect(bx, by + 30, 64, 2);
+  }
+
+  private drawNursingDesk(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 64, 18);
+    g.fillStyle(0x000000, 0.2); g.fillRect(bx + 3, by + 3, 64, 18);
+    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx, by, 64, 14, 3); // counter top
+    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx, by + 14, 64, 4); // edge
+    // Two monitors
+    g.fillStyle(0x2c3e50, 1);
+    g.fillRect(bx + 8, by + 2, 14, 9);
+    g.fillRect(bx + 42, by + 2, 14, 9);
+    g.fillStyle(0x3498db, 0.7);
+    g.fillRect(bx + 9, by + 3, 12, 7);
+    g.fillRect(bx + 43, by + 3, 12, 7);
+    // Phone
+    g.fillStyle(0xe74c3c, 1); g.fillRoundedRect(bx + 28, by + 4, 8, 5, 1);
+    g.fillStyle(0x2c3e50, 1); g.fillRect(bx + 30, by + 5, 4, 1);
+  }
+
+  private drawExamTable(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 28, 32);
+    g.fillStyle(0x000000, 0.18); g.fillRoundedRect(bx + 3, by + 3, 28, 32, 3);
+    g.fillStyle(0x95a5a6, 1); g.fillRoundedRect(bx, by, 28, 32, 3);
+    g.fillStyle(0xfdebd0, 1); g.fillRoundedRect(bx + 2, by + 2, 24, 28, 3);
+    // Paper roll at head end
+    g.fillStyle(0xffffff, 0.95); g.fillRect(bx + 2, by + 2, 24, 5);
+    g.fillStyle(0xecf0f1, 1); g.fillRect(bx + 2, by + 7, 24, 1);
+    // BP cuff hanging
+    g.fillStyle(0x2c3e50, 1); g.fillRoundedRect(bx + 10, by + 14, 8, 4, 1);
+  }
+
+  private drawTherapySofa(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 36, 18);
+    g.fillStyle(0x000000, 0.18); g.fillRoundedRect(bx + 3, by + 3, 36, 18, 4);
+    g.fillStyle(0x6c5ce7, 1); g.fillRoundedRect(bx, by, 36, 18, 4);
+    g.fillStyle(0x8e7cc9, 1); g.fillRoundedRect(bx + 2, by + 2, 32, 8, 3); // backrest
+    // Seat seams
+    g.fillStyle(0x4a3a99, 1);
+    g.fillRect(bx + 12, by + 3, 1, 12);
+    g.fillRect(bx + 24, by + 3, 1, 12);
+    // Throw pillow
+    g.fillStyle(0xfdcb6e, 1); g.fillRoundedRect(bx + 4, by + 10, 7, 6, 2);
+  }
+
+  private drawTherapyPlant(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx + 6, by + 6, 20, 20);
+    g.fillStyle(0x000000, 0.2); g.fillCircle(bx + 16, by + 18, 12);
+    g.fillStyle(0x8e44ad, 1); g.fillRect(bx + 11, by + 14, 10, 10);
+    // Tall fronds
+    g.fillStyle(0x27ae60, 1); g.fillTriangle(bx + 16, by - 4, bx + 8, by + 16, bx + 24, by + 16);
+    g.fillStyle(0x2ecc71, 0.85); g.fillTriangle(bx + 16, by, bx + 11, by + 14, bx + 21, by + 14);
   }
 
   private drawPottedPlant(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
@@ -487,9 +627,10 @@ export class GameScene extends Phaser.Scene {
   // ─── CAMERA ───────────────────────────────────────────────────────────────
   private setupCamera() {
     this.cameras.main
-      .startFollow(this.player, true, 0.08, 0.08)
+      .startFollow(this.player, true, 0.18, 0.18)
       .setZoom(CAMERA_ZOOM)
-      .setBounds(0, 0, MAP_COLS * TILE_SIZE, MAP_ROWS * TILE_SIZE);
+      .setBounds(0, 0, MAP_COLS * TILE_SIZE, MAP_ROWS * TILE_SIZE)
+      .setRoundPixels(true);
   }
 
   // ─── CRISIS SYSTEM ────────────────────────────────────────────────────────
@@ -693,6 +834,9 @@ export class GameScene extends Phaser.Scene {
   private openDialog(npc: NPC) {
     this.isDialogOpen = true;
     const dialogue = npc.getDialogue(this.state);
+    const prevProgress = { ...this.state.missionProgress };
+    const prevCompleted = [...this.state.completedMissions];
+
     this.scene.launch(SCENES.DIALOG, {
       npcDef: npc.def,
       dialogue,
@@ -705,6 +849,21 @@ export class GameScene extends Phaser.Scene {
         this.emitHudUpdate();
         this.events.emit(EV.INTERACTION_HINT, '');
         this.checkMilestones();
+
+        // Surface mission acceptance/completion right in the world so it never feels silent
+        for (const id of npc.def.missionIds) {
+          const wasInProgress = !!prevProgress[id];
+          const isInProgress = !!this.state.missionProgress[id];
+          const wasCompleted = prevCompleted.includes(id);
+          const isCompleted = this.state.completedMissions.includes(id);
+          const mission = MISSIONS.find(m => m.id === id);
+          if (!mission) continue;
+          if (!wasInProgress && isInProgress && !isCompleted) {
+            this.showFloatingText(this.player.x, this.player.y - 60, `📋 Nova missão: ${mission.title}`, '#1abc9c', 18);
+          } else if (!wasCompleted && isCompleted) {
+            this.showFloatingText(this.player.x, this.player.y - 60, `✅ Concluída: ${mission.title}`, '#2ecc71', 18);
+          }
+        }
       },
     });
   }

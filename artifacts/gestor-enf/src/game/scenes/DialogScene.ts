@@ -32,6 +32,7 @@ export class DialogScene extends Phaser.Scene {
   private showingChoices = false;
   private overlay!: Phaser.GameObjects.Rectangle;
   private onClose!: (s: Partial<GameState>) => void;
+  private inputReady = false;
 
   constructor() { super({ key: SCENES.DIALOG, active: false }); }
 
@@ -145,7 +146,11 @@ export class DialogScene extends Phaser.Scene {
     // Choice area (rendered separately, on top)
     this.choiceArea = this.add.container(0, 0).setDepth(10);
 
-    // Input
+    // Input — gated by a short grace period so the keypress that opened the
+    // dialog doesn't immediately skip the very first line (caused the
+    // "NPC só diz uma frase" bug).
+    this.inputReady = false;
+    this.time.delayedCall(260, () => { this.inputReady = true; });
     this.input.keyboard?.on('keydown-E', this.handleAdvance, this);
     this.input.keyboard?.on('keydown-SPACE', this.handleAdvance, this);
     this.input.keyboard?.on('keydown-ESC', this.handleEsc, this);
@@ -204,6 +209,7 @@ export class DialogScene extends Phaser.Scene {
 
   private handleAdvance() {
     if (this.showingChoices) return;
+    if (!this.inputReady) return;
 
     if (this.isTyping) {
       this.bodyText.setText(this.lines[this.lineIdx]);

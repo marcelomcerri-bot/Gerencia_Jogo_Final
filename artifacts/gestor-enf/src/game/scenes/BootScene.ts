@@ -65,7 +65,61 @@ export class BootScene extends Phaser.Scene {
     this.createPortraits();
     this.createPixelTexture();
     this.createLightTextures();
+    this.createPixelizedHuap();
     this.scene.start(SCENES.MENU);
+  }
+
+  // ── Render the loaded HUAP photo as a true pixel-art mural ───────────────
+  private createPixelizedHuap() {
+    if (!this.textures.exists('huap_photo')) return;
+    const img = this.textures.get('huap_photo').getSourceImage() as HTMLImageElement;
+    if (!img || !img.width) return;
+
+    const TARGET_W = 1280, TARGET_H = 720;
+    const PIX_W = 256, PIX_H = 144; // 5x downsample → chunky pixel grid
+
+    const small = document.createElement('canvas');
+    small.width = PIX_W; small.height = PIX_H;
+    const sctx = small.getContext('2d')!;
+    sctx.imageSmoothingEnabled = false;
+
+    // Cover-fit: crop to target aspect
+    const sR = img.width / img.height;
+    const dR = PIX_W / PIX_H;
+    let sx = 0, sy = 0, sw = img.width, sh = img.height;
+    if (sR > dR) { sw = img.height * dR; sx = (img.width - sw) / 2; }
+    else { sh = img.width / dR; sy = (img.height - sh) / 2; }
+    sctx.drawImage(img, sx, sy, sw, sh, 0, 0, PIX_W, PIX_H);
+
+    // Quantize to a limited palette + pop saturation in midtones
+    const data = sctx.getImageData(0, 0, PIX_W, PIX_H);
+    const px = data.data;
+    const LEVELS = 6;
+    const step = 255 / (LEVELS - 1);
+    for (let i = 0; i < px.length; i += 4) {
+      let r = Math.round(px[i]     / step) * step;
+      let g = Math.round(px[i + 1] / step) * step;
+      let b = Math.round(px[i + 2] / step) * step;
+      const lum = (r + g + b) / 3;
+      if (lum > 80 && lum < 210) {
+        r = Math.max(0, Math.min(255, r + Math.round((r - lum) * 0.30)));
+        g = Math.max(0, Math.min(255, g + Math.round((g - lum) * 0.30)));
+        b = Math.max(0, Math.min(255, b + Math.round((b - lum) * 0.30)));
+      }
+      // Subtle warm cast — gives the brutalist façade a sunlit feel
+      r = Math.min(255, r + 6);
+      g = Math.min(255, g + 2);
+      px[i] = r; px[i + 1] = g; px[i + 2] = b;
+    }
+    sctx.putImageData(data, 0, 0);
+
+    // Upscale with nearest-neighbour for crisp pixels
+    if (this.textures.exists('huap_pixel')) this.textures.remove('huap_pixel');
+    const big = this.textures.createCanvas('huap_pixel', TARGET_W, TARGET_H) as Phaser.Textures.CanvasTexture;
+    const ctx = big.getContext();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(small, 0, 0, TARGET_W, TARGET_H);
+    big.refresh();
   }
 
   // ── LIGHT TEXTURES (For Lag-Free WebGL) ──────────────────────────────────

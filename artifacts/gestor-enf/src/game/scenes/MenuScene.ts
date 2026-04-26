@@ -20,22 +20,24 @@ export class MenuScene extends Phaser.Scene {
     this.starting = false;
     const cx = GAME_WIDTH / 2;
 
-    // ── Background: real HUAP/UFF photo (cover-fit, with subtle pan)
-    if (this.textures.exists('huap_photo')) {
-      const tex = this.textures.get('huap_photo').getSourceImage() as HTMLImageElement;
-      const iw = tex.width || 1280;
-      const ih = tex.height || 720;
-      // cover-fit: scale to fill the canvas, keep aspect
-      const scale = Math.max(GAME_WIDTH / iw, GAME_HEIGHT / ih) * 1.05;
-      const photo = this.add.image(cx, GAME_HEIGHT / 2, 'huap_photo')
+    // ── Background: pixel-art reinterpretation of the HUAP/UFF facade
+    const coverKey = this.textures.exists('huap_pixel')
+      ? 'huap_pixel'
+      : this.textures.exists('huap_photo') ? 'huap_photo' : null;
+
+    if (coverKey) {
+      const photo = this.add.image(cx, GAME_HEIGHT / 2, coverKey)
         .setOrigin(0.5)
-        .setScale(scale)
+        .setDisplaySize(GAME_WIDTH * 1.06, GAME_HEIGHT * 1.06)
         .setDepth(0);
-      // Subtle Ken-Burns style pan
+      // Make sure the upscaled pixels stay crisp (no GPU bilinear smoothing)
+      (photo.texture as any).setFilter?.(Phaser.Textures.FilterMode.NEAREST);
+      // Slow Ken-Burns drift
       this.tweens.add({
         targets: photo,
-        scale: scale * 1.06,
-        duration: 12000,
+        scaleX: photo.scaleX * 1.04,
+        scaleY: photo.scaleY * 1.04,
+        duration: 14000,
         yoyo: true,
         repeat: -1,
         ease: 'Sine.easeInOut',
@@ -136,7 +138,7 @@ export class MenuScene extends Phaser.Scene {
       color: '#ffeaa7',
     }).setOrigin(0.5).setShadow(1, 1, '#000', 2).setDepth(3);
 
-    this.add.text(cx, GAME_HEIGHT - 18, 'Use os botões à direita para começar', {
+    this.add.text(cx, GAME_HEIGHT - 18, 'Pressione um dos botões para começar', {
       fontFamily: "'VT323', monospace",
       fontSize: '16px',
       color: '#bdc3c7',
