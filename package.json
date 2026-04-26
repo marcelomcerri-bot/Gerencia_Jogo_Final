@@ -3,10 +3,6 @@
   "version": "0.0.0",
   "license": "MIT",
   "private": true,
-  "workspaces": [
-    "artifacts/*",
-    "lib/*"
-  ],
   "scripts": {
     "dev": "PORT=3000 BASE_PATH=/ npm run dev -w @workspace/gestor-enf",
     "build": "npm run build -w @workspace/gestor-enf && rm -rf dist && cp -r artifacts/gestor-enf/dist/public dist"
