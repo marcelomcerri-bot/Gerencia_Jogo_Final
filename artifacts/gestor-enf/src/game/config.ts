@@ -1,12 +1,15 @@
 import * as Phaser from 'phaser';
-import { GAME_WIDTH, GAME_HEIGHT, SCENES } from './constants';
+import { GAME_WIDTH, GAME_HEIGHT } from './constants';
 import { BootScene }   from './scenes/BootScene';
 import { MenuScene }   from './scenes/MenuScene';
 import { GameScene }   from './scenes/GameScene';
 import { HUDScene }    from './scenes/HUDScene';
 import { DialogScene } from './scenes/DialogScene';
 
-export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameConfig {
+export function createGameConfig(
+  parent: HTMLElement,
+  scaleMode: 'fit' | 'none' = 'fit'
+): Phaser.Types.Core.GameConfig {
   return {
     type: Phaser.AUTO,
     width: GAME_WIDTH,
@@ -26,12 +29,21 @@ export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameCon
       },
     },
     scene: [BootScene, MenuScene, GameScene, HUDScene, DialogScene],
-    scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
-      width: GAME_WIDTH,
-      height: GAME_HEIGHT,
-    },
+    scale: scaleMode === 'none'
+      ? {
+          // Scale.NONE: Phaser does NOT measure the parent via getBoundingClientRect.
+          // The canvas is exactly GAME_WIDTH × GAME_HEIGHT CSS pixels.
+          // We handle all scaling/centering via CSS transforms on wrapper elements.
+          mode: Phaser.Scale.NONE,
+          width: GAME_WIDTH,
+          height: GAME_HEIGHT,
+        }
+      : {
+          mode: Phaser.Scale.FIT,
+          autoCenter: Phaser.Scale.CENTER_BOTH,
+          width: GAME_WIDTH,
+          height: GAME_HEIGHT,
+        },
     input: {
       keyboard: true,
       mouse: true,
