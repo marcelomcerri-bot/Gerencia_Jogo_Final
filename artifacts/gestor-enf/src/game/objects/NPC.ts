@@ -1,6 +1,6 @@
 import * as Phaser from 'phaser';
 import { TILE_SIZE, Direction } from '../constants';
-import type { NPCDef, GameState } from '../data/gameData';
+import type { NPCDef, GameState, DialogueDef } from '../data/gameData';
 
 const NPC_SPEED = 55;
 
@@ -9,7 +9,7 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
   private direction: Direction = 'down';
   private stepTimer = 0;
   private stepFrame = 0;
-  private readonly STEP_INTERVAL = 300;
+  private readonly STEP_INTERVAL = 280;
   private waypointIdx = 0;
   private waitTimer = 0;
   private isWaiting = false;
@@ -20,11 +20,13 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
   private interactionBubble: Phaser.GameObjects.Text | null = null;
   private interactionBubbleTimer = 0;
 
-  // ── Stuck recovery
   private lastX = 0;
   private lastY = 0;
   private stuckTimer = 0;
-  private readonly STUCK_THRESHOLD = 1500; // ms with no real progress -> consider stuck
+  private readonly STUCK_THRESHOLD = 1500;
+
+  // Track how many times the player has talked to this NPC (for dialogue rotation)
+  private conversationCount = 0;
 
   constructor(scene: Phaser.Scene, def: NPCDef) {
     const x = (def.startCol + 0.5) * TILE_SIZE;
@@ -37,7 +39,6 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(10);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
-    // Tight feet-only body: keeps NPCs from snagging on door jambs and props
     body.setSize(16, 14);
     body.setOffset(14, 46);
     body.setImmovable(false);
@@ -46,7 +47,6 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     this.lastX = x;
     this.lastY = y;
 
-    // Name label with role color
     const roleColors: Record<string, string> = {
       doctor: '#3498db', nurse: '#2ecc71', technician: '#9b59b6',
       admin: '#f39c12', receptionist: '#1abc9c', other: '#bdc3c7',
@@ -61,13 +61,11 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
       strokeThickness: 3,
     }).setOrigin(0.5, 1).setDepth(20);
 
-    // Interaction bubble
     this.interactionBubble = scene.add.text(x, y - 64, '', {
       fontFamily: 'sans-serif',
       fontSize: '16px',
     }).setOrigin(0.5, 1).setDepth(21).setVisible(false);
 
-    // Role tag
     const roleTag = scene.add.text(x, y - 48, def.title, {
       fontFamily: "'VT323', monospace",
       fontSize: '11px',
@@ -77,7 +75,6 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     }).setOrigin(0.5, 1).setDepth(20).setVisible(false);
     this.setData('roleTag', roleTag);
 
-    // Exclamation mark
     this.exclamationMark = scene.add.text(x, y - 56, '!', {
       fontFamily: "'Press Start 2P', monospace",
       fontSize: '14px',
@@ -102,15 +99,14 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
 
     if (this.isWaiting) {
       this.waitTimer -= delta;
-      
-      // Update interaction bubble
+
       if (this.interactionBubble?.visible) {
         this.interactionBubbleTimer -= delta;
         if (this.interactionBubbleTimer <= 0) {
-           this.interactionBubble.setVisible(false);
+          this.interactionBubble.setVisible(false);
         } else {
-           const floatY = Math.sin(this.scene.time.now / 200) * 2;
-           this.interactionBubble.setY(this.y - this.displayHeight / 2 - 32 + floatY);
+          const floatY = Math.sin(this.scene.time.now / 200) * 2;
+          this.interactionBubble.setY(this.y - this.displayHeight / 2 - 32 + floatY);
         }
       }
 
@@ -131,7 +127,6 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     const dx = tx - this.x, dy = ty - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Stuck recovery: if NPC barely moves while trying to reach waypoint, skip to next
     const movedDelta = Math.hypot(this.x - this.lastX, this.y - this.lastY);
     if (movedDelta < 0.5 && dist > 12) {
       this.stuckTimer += delta;
@@ -152,49 +147,48 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
       this.setPosition(tx, ty);
       this.isWaiting = true;
       this.waitTimer = Phaser.Math.Between(2000, 5000);
-      
+
       let facedPoint: any = null;
       if (this.scene) {
-        const gs = this.scene as any; // GameScene
+        const gs = this.scene as any;
         if (gs.interactionPoints) {
-           for(const pt of gs.interactionPoints) {
-              const ndx = pt.x - this.x;
-              const ndy = pt.y - this.y;
-              if (Math.abs(ndx) <= 34 && Math.abs(ndy) <= 34) {
-                 if (Math.abs(ndx) > Math.abs(ndy)) {
-                    this.direction = ndx > 0 ? 'right' : 'left';
-                 } else {
-                    this.direction = ndy > 0 ? 'down' : 'up';
-                 }
-                 facedPoint = pt;
-                 break;
+          for (const pt of gs.interactionPoints) {
+            const ndx = pt.x - this.x;
+            const ndy = pt.y - this.y;
+            if (Math.abs(ndx) <= 34 && Math.abs(ndy) <= 34) {
+              if (Math.abs(ndx) > Math.abs(ndy)) {
+                this.direction = ndx > 0 ? 'right' : 'left';
+              } else {
+                this.direction = ndy > 0 ? 'down' : 'up';
               }
-           }
+              facedPoint = pt;
+              break;
+            }
+          }
         }
       }
 
       if (!facedPoint) {
-         if (Math.random() < 0.4) this.direction = 'up';
-         else if (Math.random() < 0.2) this.direction = 'down';
-         else if (Math.random() < 0.2) this.direction = 'left';
-         else this.direction = 'right';
+        if (Math.random() < 0.4) this.direction = 'up';
+        else if (Math.random() < 0.2) this.direction = 'down';
+        else if (Math.random() < 0.2) this.direction = 'left';
+        else this.direction = 'right';
 
-         // Rarely converse if no point
-         if (Math.random() < 0.2) {
-             this.interactionBubble?.setText(Math.random() > 0.5 ? '...' : '?').setVisible(true);
-             this.interactionBubbleTimer = 2000;
-         }
+        if (Math.random() < 0.2) {
+          this.interactionBubble?.setText(Math.random() > 0.5 ? '...' : '?').setVisible(true);
+          this.interactionBubbleTimer = 2000;
+        }
       } else {
-         const typeMap: Record<string, string[]> = {
-            'work': ['PC', 'DOC', 'ARQ'],
-            'inspect': ['LAB', 'OBS', 'REL'],
-            'sit': ['...', 'ZZZ'],
-            'rest': ['CAFE', 'ALM', '...']
-         };
-         const icons = typeMap[facedPoint.type] || ['...'];
-         const icon = icons[Math.floor(Math.random() * icons.length)];
-         this.interactionBubble?.setText(icon).setVisible(true);
-         this.interactionBubbleTimer = this.waitTimer * 0.8;
+        const typeMap: Record<string, string[]> = {
+          'work': ['💻', '📋', '📁'],
+          'inspect': ['🔬', '📊', '👁'],
+          'sit': ['...', '💤'],
+          'rest': ['☕', '🍱', '...'],
+        };
+        const icons = typeMap[facedPoint.type] || ['...'];
+        const icon = icons[Math.floor(Math.random() * icons.length)];
+        this.interactionBubble?.setText(icon).setVisible(true);
+        this.interactionBubbleTimer = this.waitTimer * 0.8;
       }
       this.updateFrame(delta, false);
     } else {
@@ -248,11 +242,30 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     return this.def.missionIds.find(id => !state.completedMissions.includes(id));
   }
 
-  getDialogue(state: GameState) {
-    for (const d of this.def.dialogues) {
-      if (!d.condition || d.condition(state)) return d;
+  /** Returns dialogue with choices shuffled — order changes every conversation */
+  getDialogue(state: GameState): DialogueDef {
+    let found: DialogueDef | null = null;
+
+    // If NPC has dialogue pools, rotate through them
+    if (this.def.dialoguePools) {
+      const poolIdx = this.conversationCount % this.def.dialoguePools.length;
+      const pool = this.def.dialoguePools[poolIdx];
+      for (const d of pool) {
+        if (!d.condition || d.condition(state)) { found = d; break; }
+      }
+      if (!found) found = pool[pool.length - 1];
+    } else {
+      for (const d of this.def.dialogues) {
+        if (!d.condition || d.condition(state)) { found = d; break; }
+      }
+      if (!found) found = this.def.dialogues[this.def.dialogues.length - 1];
     }
-    return this.def.dialogues[this.def.dialogues.length - 1];
+
+    this.conversationCount++;
+
+    // Shuffle choices so correct answer is never in a predictable position
+    const shuffledChoices = shuffleArray([...found.choices]);
+    return { ...found, choices: shuffledChoices };
   }
 
   destroy(fromScene?: boolean) {
@@ -261,4 +274,12 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     (this.getData('roleTag') as Phaser.GameObjects.Text | null)?.destroy();
     super.destroy(fromScene);
   }
+}
+
+function shuffleArray<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
