@@ -178,114 +178,142 @@ export class HUDScene extends Phaser.Scene {
   }
 
   // ── TOP BAR ───────────────────────────────────────────────────────────────
+  // Layout (bx=14, by=12, barH=72):
+  //  [TIME 0-144] [ENERGY 152-330] [STRESS 338-494] [CAREER 502-694] [MISSION 702..barW]
   private buildTopBar() {
-    const barW = MM_X - 28;
-    const barH = 76;
+    const barW = Math.min(MM_X - 24, GAME_WIDTH - MM_W - 40);
+    const barH = 72;
     const bx = 14, by = 12;
 
-    // Shadow
+    // Drop shadow
     const shadow = this.add.graphics();
-    shadow.fillStyle(0x000000, 0.3);
-    shadow.fillRoundedRect(bx + 4, by + 4, barW, barH, 14);
+    shadow.fillStyle(0x000000, 0.35);
+    shadow.fillRoundedRect(bx + 3, by + 3, barW, barH, 12);
 
-    // Background
+    // Background panel
     const bg = this.add.graphics();
-    bg.fillStyle(0x0a1628, 0.96);
-    bg.fillRoundedRect(bx, by, barW, barH, 14);
-    bg.lineStyle(2, 0x1abc9c, 0.8);
-    bg.strokeRoundedRect(bx, by, barW, barH, 14);
+    bg.fillStyle(0x060e1e, 0.97);
+    bg.fillRoundedRect(bx, by, barW, barH, 12);
+    bg.lineStyle(1, 0x1abc9c, 0.7);
+    bg.strokeRoundedRect(bx, by, barW, barH, 12);
 
-    // ── Section: Day/Time ──
-    const secBg1 = this.add.graphics();
-    secBg1.fillStyle(0x152840, 1);
-    secBg1.fillRoundedRect(bx + 8, by + 7, 128, barH - 14, 8);
+    // Inner top accent line
+    bg.lineStyle(1, 0x1abc9c, 0.20);
+    bg.lineBetween(bx + 12, by + 1, bx + barW - 12, by + 1);
 
-    this.shiftIcon = this.add.text(bx + 16, by + 20, '☀️', { fontSize: '20px' });
+    // ── SECTION helper: draws a dark inset panel ──────────────────────────────
+    const sec = (x: number, w: number) => {
+      const g = this.add.graphics();
+      g.fillStyle(0x0d1f36, 1);
+      g.fillRoundedRect(bx + x, by + 6, w, barH - 12, 7);
+      return g;
+    };
 
-    this.dayText = this.add.text(bx + 42, by + 16, 'DIA 1', {
-      fontFamily: 'monospace', fontSize: '10px', color: '#3498db',
+    // ─── TIME / DAY ──────────────────────────────────── x: 0..144 ────────────
+    sec(0, 144);
+
+    // Shift indicator dot (coloured rectangle, no emoji)
+    this.shiftIcon = this.add.text(bx + 10, by + 10, 'TURNO', {
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: '6px', color: '#3498db',
     });
 
-    this.timeText = this.add.text(bx + 42, by + 32, '08:00', {
-      fontFamily: "'VT323', monospace", fontSize: '28px', color: '#f1c40f',
+    this.dayText = this.add.text(bx + 10, by + 24, 'DIA 1 · MANHA', {
+      fontFamily: "'VT323', monospace", fontSize: '19px', color: '#f1c40f',
     });
 
-    // ── Section: Energy ──
-    const secBg2 = this.add.graphics();
-    secBg2.fillStyle(0x152840, 1);
-    secBg2.fillRoundedRect(bx + 148, by + 7, 178, barH - 14, 8);
+    this.timeText = this.add.text(bx + 72, by + 8, '08:00', {
+      fontFamily: "'VT323', monospace", fontSize: '44px', color: '#f1c40f',
+    }).setOrigin(0.5, 0);
 
-    this.add.text(bx + 156, by + 16, '⚡ ENERGIA', {
-      fontFamily: 'monospace', fontSize: '10px', color: '#2ecc71',
+    // ─── ENERGY ──────────────────────────────────────── x: 152..330 ──────────
+    sec(152, 178);
+
+    this.add.text(bx + 162, by + 10, 'ENERGIA', {
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: '7px', color: '#2ecc71',
     });
 
-    const energyBg = this.add.graphics();
-    energyBg.fillStyle(0x0a1628, 1);
-    energyBg.fillRoundedRect(bx + 156, by + 36, 130, 16, 8);
+    this.energyValText = this.add.text(bx + 270, by + 10, '100%', {
+      fontFamily: "'VT323', monospace", fontSize: '20px', color: '#2ecc71',
+    }).setOrigin(1, 0);
+
+    // Track bar bg
+    const enBg = this.add.graphics();
+    enBg.fillStyle(0x030a12, 1);
+    enBg.fillRoundedRect(bx + 162, by + 30, 148, 18, 9);
+    enBg.lineStyle(1, 0x1abc9c, 0.20);
+    enBg.strokeRoundedRect(bx + 162, by + 30, 148, 18, 9);
 
     this.energyBarFill = this.add.graphics();
 
-    this.energyValText = this.add.text(bx + 220, by + 27, '100%', {
-      fontFamily: "'VT323', monospace", fontSize: '16px', color: '#2ecc71',
-    }).setOrigin(0.5, 0);
-
-    // ── Section: Stress ──
-    const secBg3 = this.add.graphics();
-    secBg3.fillStyle(0x152840, 1);
-    secBg3.fillRoundedRect(bx + 338, by + 7, 168, barH - 14, 8);
-
-    this.add.text(bx + 346, by + 16, '😰 ESTRESSE', {
-      fontFamily: 'monospace', fontSize: '10px', color: '#e74c3c',
+    this.add.text(bx + 162, by + 52, 'ENERGIA  FISICA', {
+      fontFamily: 'monospace', fontSize: '7px', color: '#2c3e50',
     });
 
-    const stressBg = this.add.graphics();
-    stressBg.fillStyle(0x0a1628, 1);
-    stressBg.fillRoundedRect(bx + 346, by + 36, 120, 16, 8);
+    // ─── STRESS ──────────────────────────────────────── x: 338..494 ──────────
+    sec(338, 156);
+
+    this.add.text(bx + 348, by + 10, 'ESTRESSE', {
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: '7px', color: '#e74c3c',
+    });
+
+    this.stressValText = this.add.text(bx + 486, by + 10, '0%', {
+      fontFamily: "'VT323', monospace", fontSize: '20px', color: '#2ecc71',
+    }).setOrigin(1, 0);
+
+    const stBg = this.add.graphics();
+    stBg.fillStyle(0x030a12, 1);
+    stBg.fillRoundedRect(bx + 348, by + 30, 136, 18, 9);
+    stBg.lineStyle(1, 0xe74c3c, 0.20);
+    stBg.strokeRoundedRect(bx + 348, by + 30, 136, 18, 9);
 
     this.stressBarFill = this.add.graphics();
 
-    this.stressValText = this.add.text(bx + 406, by + 27, '0%', {
-      fontFamily: "'VT323', monospace", fontSize: '16px', color: '#e74c3c',
-    }).setOrigin(0.5, 0);
+    this.add.text(bx + 348, by + 52, 'NIVEL  DE  ESTRESSE', {
+      fontFamily: 'monospace', fontSize: '7px', color: '#2c3e50',
+    });
 
-    // ── Section: Career ──
-    const secBg4 = this.add.graphics();
-    secBg4.fillStyle(0x152840, 1);
-    secBg4.fillRoundedRect(bx + 518, by + 7, 200, barH - 14, 8);
+    // ─── CAREER ──────────────────────────────────────── x: 502..694 ──────────
+    sec(502, 192);
 
-    this.prestigeText = this.add.text(bx + 526, by + 13, '⭐ 0 pts', {
+    this.add.text(bx + 512, by + 10, 'CARREIRA', {
+      fontFamily: "'Press Start 2P', monospace",
+      fontSize: '7px', color: '#f39c12',
+    });
+
+    this.prestigeText = this.add.text(bx + 512, by + 24, '0 pts', {
       fontFamily: "'VT323', monospace", fontSize: '24px', color: '#f39c12',
     });
 
-    this.levelText = this.add.text(bx + 526, by + 38, 'Estagiária', {
-      fontFamily: 'monospace', fontSize: '10px', color: '#95a5a6',
+    this.levelText = this.add.text(bx + 512, by + 50, 'Estagiaria', {
+      fontFamily: 'monospace', fontSize: '8px', color: '#7f8c8d',
     });
 
-    const careerBg = this.add.graphics();
-    careerBg.fillStyle(0x0a1628, 1);
-    careerBg.fillRoundedRect(bx + 526, by + 54, 180, 8, 4);
+    const carBg = this.add.graphics();
+    carBg.fillStyle(0x030a12, 1);
+    carBg.fillRoundedRect(bx + 620, by + 24, 66, 10, 5);
 
     this.careerBarFill = this.add.graphics();
 
-    // ── Section: Active Mission ──
-    const missionW = barW - 728;
-    if (missionW > 80) {
-      const secBg5 = this.add.graphics();
-      secBg5.fillStyle(0x152840, 1);
-      secBg5.fillRoundedRect(bx + 730, by + 7, missionW - 16, barH - 14, 8);
+    // ─── MISSION ─────────────────────────────────────── x: 702..barW ─────────
+    const missionW = barW - 708;
+    if (missionW >= 80) {
+      sec(702, missionW - 8);
 
-      this.add.text(bx + 738, by + 12, '📋 MISSÃO ATIVA', {
-        fontFamily: 'monospace', fontSize: '10px', color: '#1abc9c',
+      this.add.text(bx + 712, by + 10, 'MISSAO ATIVA', {
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: '7px', color: '#1abc9c',
       });
 
-      this.missionText = this.add.text(bx + 738, by + 28, '', {
-        fontFamily: "'VT323', monospace", fontSize: '18px', color: '#1abc9c',
-        wordWrap: { width: missionW - 32 },
+      this.missionText = this.add.text(bx + 712, by + 26, '', {
+        fontFamily: "'VT323', monospace", fontSize: '19px', color: '#1abc9c',
+        wordWrap: { width: missionW - 28 },
         maxLines: 2,
-        lineSpacing: -2,
+        lineSpacing: 0,
       });
     } else {
-      // Fallback if not enough space
       this.missionText = this.add.text(0, 0, '').setVisible(false);
     }
   }
@@ -339,49 +367,58 @@ export class HUDScene extends Phaser.Scene {
   private onHudUpdate(data: { state: GameState; playerX: number; playerY: number; activeMission?: string }) {
     const { state, playerX, playerY, activeMission } = data;
 
+    const bx = 14, by = 12;
+
     // Time & day
     const totalMin = Math.floor(state.gameTime) % 1440;
     const h = Math.floor(totalMin / 60), m = totalMin % 60;
     this.timeText.setText(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
 
-    const shiftName = h >= 7 && h < 15 ? 'MANHÃ' : h >= 15 && h < 23 ? 'TARDE' : 'NOITE';
-    this.dayText.setText(`DIA ${state.day} · ${shiftName}`);
-    this.shiftIcon.setText(h >= 7 && h < 15 ? '☀️' : h >= 15 && h < 23 ? '🌆' : '🌙');
+    const shiftName = h >= 7 && h < 15 ? 'MANHA' : h >= 15 && h < 23 ? 'TARDE' : 'NOITE';
+    const shiftColor = h >= 7 && h < 15 ? '#f1c40f' : h >= 15 && h < 23 ? '#e67e22' : '#9b59b6';
+    this.dayText.setText(`DIA ${state.day}  ${shiftName}`).setColor(shiftColor);
+    this.shiftIcon.setColor(shiftColor);
 
-    // Energy bar
-    const bx = 14, by = 12, barH = 76;
+    // Energy bar — guard against zero/negative fill widths
     const ep = Math.max(0, Math.min(1, (state.energy || 0) / 100));
     const eColor = ep > 0.5 ? 0x2ecc71 : ep > 0.25 ? 0xf1c40f : 0xe74c3c;
+    const eHexStr = ep > 0.5 ? '#2ecc71' : ep > 0.25 ? '#f1c40f' : '#e74c3c';
     this.energyBarFill.clear();
-    this.energyBarFill.fillStyle(eColor, 1);
-    this.energyBarFill.fillRoundedRect(bx + 156, by + 36, 130 * ep, 16, 8);
-    this.energyValText.setText(`${Math.round((state.energy || 0))}%`).setColor(
-      ep > 0.5 ? '#2ecc71' : ep > 0.25 ? '#f1c40f' : '#e74c3c'
-    );
+    const eW = Math.max(0, 148 * ep);
+    if (eW > 2) {
+      this.energyBarFill.fillStyle(eColor, 1);
+      this.energyBarFill.fillRoundedRect(bx + 162, by + 30, eW, 18, Math.min(9, eW / 2));
+    }
+    this.energyValText.setText(`${Math.round(state.energy || 0)}%`).setColor(eHexStr);
 
     // Stress bar
     const sp = Math.max(0, Math.min(1, (state.stress || 0) / 100));
     const sColor = sp < 0.3 ? 0x2ecc71 : sp < 0.6 ? 0xf1c40f : 0xe74c3c;
+    const sHexStr = sp < 0.3 ? '#2ecc71' : sp < 0.6 ? '#f1c40f' : '#e74c3c';
     this.stressBarFill.clear();
-    this.stressBarFill.fillStyle(sColor, 1);
-    this.stressBarFill.fillRoundedRect(bx + 346, by + 36, 120 * sp, 16, 8);
-    this.stressValText.setText(`${Math.round((state.stress || 0))}%`).setColor(
-      sp < 0.3 ? '#2ecc71' : sp < 0.6 ? '#f1c40f' : '#e74c3c'
-    );
+    const sW = Math.max(0, 136 * sp);
+    if (sW > 2) {
+      this.stressBarFill.fillStyle(sColor, 1);
+      this.stressBarFill.fillRoundedRect(bx + 348, by + 30, sW, 18, Math.min(9, sW / 2));
+    }
+    this.stressValText.setText(`${Math.round(state.stress || 0)}%`).setColor(sHexStr);
 
     // Career
     const lvInfo = getLevelInfo(state.prestige);
-    this.prestigeText.setText(`⭐ ${state.prestige} pts`);
+    this.prestigeText.setText(`${state.prestige} pts`);
     this.levelText.setText(lvInfo.title);
 
     // Career progress bar
     const cur = CAREER_LEVELS[lvInfo.level];
     const nxt = CAREER_LEVELS[Math.min(lvInfo.level + 1, CAREER_LEVELS.length - 1)];
     const careerPct = lvInfo.level >= CAREER_LEVELS.length - 1 ? 1
-      : (state.prestige - cur.minPrestige) / (nxt.minPrestige - cur.minPrestige);
+      : (state.prestige - cur.minPrestige) / Math.max(1, nxt.minPrestige - cur.minPrestige);
     this.careerBarFill.clear();
-    this.careerBarFill.fillStyle(0xf39c12, 1);
-    this.careerBarFill.fillRoundedRect(bx + 526, by + 54, 180 * Math.min(1, careerPct), 8, 4);
+    const cW = Math.max(0, 66 * Math.min(1, careerPct));
+    if (cW > 1) {
+      this.careerBarFill.fillStyle(0xf39c12, 1);
+      this.careerBarFill.fillRoundedRect(bx + 620, by + 24, cW, 10, Math.min(5, cW / 2));
+    }
 
     // Active mission
     if (activeMission) {

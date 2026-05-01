@@ -53,9 +53,10 @@ export class BootScene extends Phaser.Scene {
     });
     void loadLabel;
 
-    // Real HUAP/UFF photo for the cover
+    // HUAP/UFF cover images
     const base = (import.meta as any).env?.BASE_URL || '/';
     this.load.image('huap_photo', `${base}assets/huap.png`);
+    this.load.image('huap_pixelart', `${base}assets/huap_pixelart.png`);
   }
 
   create() {

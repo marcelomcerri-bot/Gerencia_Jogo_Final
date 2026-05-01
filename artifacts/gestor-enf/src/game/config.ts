@@ -21,6 +21,8 @@ export function createGameConfig(parent: HTMLElement): Phaser.Types.Core.GameCon
       arcade: {
         gravity: { x: 0, y: 0 },
         debug: false,
+        fixedStep: false,
+        fps: 60,
       },
     },
     scene: [BootScene, MenuScene, GameScene, HUDScene, DialogScene],

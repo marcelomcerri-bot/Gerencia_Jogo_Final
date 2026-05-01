@@ -9,6 +9,7 @@ import type { GameState, CrisisEvent } from '../data/gameData';
 import { Player } from '../objects/Player';
 import { NPC } from '../objects/NPC';
 import { loadGame, saveGame } from '../utils/save';
+import { playMusic, fadeOutMusic } from '../utils/audio';
 
 export class GameScene extends Phaser.Scene {
   private player!: Player;
@@ -63,6 +64,7 @@ export class GameScene extends Phaser.Scene {
 
     this.scene.launch(SCENES.HUD);
     this.cameras.main.fadeIn(700);
+    playMusic('game');
 
     // Auto-save every 30s
     this.time.addEvent({ delay: 30000, loop: true, callback: () => saveGame(this.state) });
@@ -694,7 +696,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   // ─── UPDATE ───────────────────────────────────────────────────────────────
-  update(time: number, delta: number) {
+  update(time: number, rawDelta: number) {
+    // Cap delta to 40ms (25fps minimum) to prevent startup stutter / speed ramp
+    const delta = Math.min(rawDelta, 40);
     const vpad = this.getVPad();
 
     // Check menu key early (even if dialog/crisis is open, though pause usually blocks this, let's keep it safe)
