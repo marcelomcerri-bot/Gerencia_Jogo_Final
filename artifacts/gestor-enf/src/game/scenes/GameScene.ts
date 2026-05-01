@@ -712,7 +712,32 @@ export class GameScene extends Phaser.Scene {
 
   private getVPad() {
     const hud = this.scene.get('HUDScene') as any;
-    return hud?.virtualPad || { up: false, down: false, left: false, right: false, sprint: false, actionJustPressed: false, missionJustPressed: false, menuJustPressed: false };
+    const h = hud?.virtualPad ?? {};
+    const w = (window as any).virtualPad ?? {};
+    const pad = {
+      up:                 !!(h.up   || w.up),
+      down:               !!(h.down || w.down),
+      left:               !!(h.left || w.left),
+      right:              !!(h.right || w.right),
+      sprint:             !!(h.sprint || w.sprint),
+      actionJustPressed:  !!(h.actionJustPressed  || w.actionJustPressed),
+      missionJustPressed: !!(h.missionJustPressed || w.missionJustPressed),
+      menuJustPressed:    !!(h.menuJustPressed    || w.menuJustPressed),
+    };
+    // Proxy: writing "false" on a JustPressed key also clears the original sources
+    const clearJust = (key: 'actionJustPressed' | 'missionJustPressed' | 'menuJustPressed') => {
+      if (h[key]) h[key] = false;
+      if ((window as any).virtualPad?.[key]) (window as any).virtualPad[key] = false;
+    };
+    return new Proxy(pad, {
+      set(target, prop, value) {
+        (target as any)[prop] = value;
+        if (value === false && (prop === 'actionJustPressed' || prop === 'missionJustPressed' || prop === 'menuJustPressed')) {
+          clearJust(prop as any);
+        }
+        return true;
+      }
+    });
   }
 
   // ─── UPDATE ───────────────────────────────────────────────────────────────

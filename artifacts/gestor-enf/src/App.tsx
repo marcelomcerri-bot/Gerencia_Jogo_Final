@@ -103,6 +103,9 @@ export default function App() {
       gameRef.current = null;
     }
 
+    // Expose portrait flag so HUDScene can decide whether to build mobile controls
+    (window as any).__portraitMobile = portrait;
+
     const config = createGameConfig(
       containerRef.current,
       portrait ? "none" : "fit"
@@ -130,27 +133,36 @@ export default function App() {
     const { outerStyle, innerStyle } = getPortraitLayout();
 
     return (
-      <div style={outerStyle}>
-        <div style={innerStyle}>
-          {/* Phaser canvas injected here (Scale.NONE → 1280×720 CSS px) */}
-          <div
-            id="game-container"
-            ref={containerRef}
-            style={{ position: "absolute", inset: 0 }}
-          />
-          {/* React UI rendered in the same 1280×720 logical space */}
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              zIndex: 10,
-              pointerEvents: "none",
-            }}
-          >
-            <AppUI onStartGame={handleStartGame} />
+      <>
+        {/* Rotated + scaled game canvas layer */}
+        <div style={outerStyle}>
+          <div style={innerStyle}>
+            {/* Phaser canvas injected here (Scale.NONE → 1280×720 CSS px) */}
+            <div
+              id="game-container"
+              ref={containerRef}
+              style={{ position: "absolute", inset: 0 }}
+            />
           </div>
         </div>
-      </div>
+
+        {/*
+          React UI layer — lives in NORMAL portrait screen space (not rotated).
+          This guarantees touch events hit-test correctly on any mobile browser.
+          HomeMenu centres its buttons at 50%/50%, which visually centres them
+          over the rotated game canvas filling the portrait screen.
+        */}
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100,
+            pointerEvents: "none",
+          }}
+        >
+          <AppUI onStartGame={handleStartGame} isMobile={true} />
+        </div>
+      </>
     );
   }
 
