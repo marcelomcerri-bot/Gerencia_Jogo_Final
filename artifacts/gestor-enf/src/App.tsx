@@ -2,11 +2,18 @@ import { useEffect, useRef } from "react";
 import * as Phaser from "phaser";
 import { createGameConfig } from "./game/config";
 import { AppUI } from "./ui/AppUI";
-import { RotateOverlay } from "./ui/RotateOverlay";
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
+
+  useEffect(() => {
+    // Try to lock orientation to landscape on mobile (works on most Android browsers)
+    const orientation = screen.orientation as ScreenOrientation & { lock?: (o: string) => Promise<void> };
+    if (orientation?.lock) {
+      orientation.lock("landscape").catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     // We instantiate Phaser ONCE. It runs independently underneath the React Router overlay.
@@ -44,8 +51,6 @@ export default function App() {
         <AppUI onStartGame={handleStartGame} />
       </div>
 
-      {/* Portrait orientation overlay for mobile */}
-      <RotateOverlay />
     </div>
   );
 }
