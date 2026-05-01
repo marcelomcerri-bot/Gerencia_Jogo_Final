@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import * as Phaser from "phaser";
 import { createGameConfig } from "./game/config";
 import { AppUI } from "./ui/AppUI";
+import { RotateOverlay } from "./ui/RotateOverlay";
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,6 +43,9 @@ export default function App() {
       <div className="absolute inset-0 z-10 pointer-events-none">
         <AppUI onStartGame={handleStartGame} />
       </div>
+
+      {/* Portrait orientation overlay for mobile */}
+      <RotateOverlay />
     </div>
   );
 }

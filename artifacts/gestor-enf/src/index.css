@@ -11,12 +11,18 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
   background: #0a0a0f;
+  /* Fill safe area on devices with notch / home bar */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 canvas {
   display: block;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  touch-action: none;
 }
 
 #game-container {
