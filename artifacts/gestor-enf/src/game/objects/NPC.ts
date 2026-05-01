@@ -181,17 +181,17 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
 
          // Rarely converse if no point
          if (Math.random() < 0.2) {
-             this.interactionBubble?.setText(Math.random() > 0.5 ? '💬' : '🤔').setVisible(true);
+             this.interactionBubble?.setText(Math.random() > 0.5 ? '...' : '?').setVisible(true);
              this.interactionBubbleTimer = 2000;
          }
       } else {
          const typeMap: Record<string, string[]> = {
-            'work': ['💻', '📋', '📁'],
-            'inspect': ['🔬', '🩺', '📋'],
-            'sit': ['💬', '🥱'],
-            'rest': ['☕', '🥪', '💬']
+            'work': ['PC', 'DOC', 'ARQ'],
+            'inspect': ['LAB', 'OBS', 'REL'],
+            'sit': ['...', 'ZZZ'],
+            'rest': ['CAFE', 'ALM', '...']
          };
-         const icons = typeMap[facedPoint.type] || ['💬'];
+         const icons = typeMap[facedPoint.type] || ['...'];
          const icon = icons[Math.floor(Math.random() * icons.length)];
          this.interactionBubble?.setText(icon).setVisible(true);
          this.interactionBubbleTimer = this.waitTimer * 0.8;

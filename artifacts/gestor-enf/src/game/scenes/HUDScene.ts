@@ -632,7 +632,7 @@ export class HUDScene extends Phaser.Scene {
     bg.fillStyle(0x0a0f1e, 0.97).fillRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16)
       .lineStyle(3, 0x1abc9c, 1).strokeRoundedRect(-panelW / 2, -panelH / 2, panelW, panelH, 16);
 
-    const title = this.add.text(0, -panelH / 2 + 22, '📋  MISSÕES  DO  HUAP', {
+    const title = this.add.text(0, -panelH / 2 + 22, 'MISSOES DO HUAP', {
       fontFamily: "'Press Start 2P', monospace", fontSize: '11px', color: '#1abc9c',
     }).setOrigin(0.5);
 

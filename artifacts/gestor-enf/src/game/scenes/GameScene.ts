@@ -184,6 +184,19 @@ export class GameScene extends Phaser.Scene {
         }
       }
     }
+
+    // Bake both static Graphics into RenderTextures so they render as a
+    // single drawImage/draw call per frame instead of hundreds of shape commands.
+    const worldW = MAP_COLS * TILE_SIZE;
+    const worldH = MAP_ROWS * TILE_SIZE;
+
+    const ambientRT = this.add.renderTexture(0, 0, worldW, worldH).setOrigin(0, 0).setDepth(1);
+    ambientRT.draw(this.ambientGfx, 0, 0);
+    this.ambientGfx.destroy();
+
+    const propsRT = this.add.renderTexture(0, 0, worldW, worldH).setOrigin(0, 0).setDepth(2);
+    propsRT.draw(propsGfx, 0, 0);
+    propsGfx.destroy();
   }
 
   private isNearWall(r: number, c: number): boolean {
@@ -554,22 +567,22 @@ export class GameScene extends Phaser.Scene {
   // ─── ROOM LABELS ─────────────────────────────────────────────────────────
   private buildRoomLabels() {
     const labels: { col: number; row: number; text: string }[] = [
-      { col: 6, row: 2,   text: '🚪 Recepção & Triagem' },
-      { col: 18, row: 2,  text: '🚑 Pronto-Socorro' },
-      { col: 30, row: 2,  text: '💊 Farmácia' },
-      { col: 43, row: 2,  text: '🔬 Laboratório' },
-      { col: 55, row: 2,  text: '📷 Imagem' },
-      { col: 67, row: 2,  text: '🗂️ Diretoria' },
-      { col: 5, row: 17,  text: '🔧 CME' },
-      { col: 16, row: 17, text: '☕ Copa & Nutrição' },
-      { col: 30, row: 17, text: '🛏️ Enfermaria' },
-      { col: 45, row: 17, text: '🫀 UTI Adulto' },
-      { col: 63, row: 17, text: '📋 Posto Enf. Central' },
-      { col: 7, row: 31,  text: '🏥 Ambulatório' },
-      { col: 20, row: 31, text: '👶 Maternidade' },
-      { col: 34, row: 31, text: '💉 Oncologia' },
-      { col: 48, row: 31, text: '🏃 Reabilitação' },
-      { col: 64, row: 31, text: '🧠 Saúde Mental' },
+      { col: 6, row: 2,   text: 'RECEPCAO & TRIAGEM' },
+      { col: 18, row: 2,  text: 'PRONTO-SOCORRO' },
+      { col: 30, row: 2,  text: 'FARMACIA' },
+      { col: 43, row: 2,  text: 'LABORATORIO' },
+      { col: 55, row: 2,  text: 'IMAGEM' },
+      { col: 67, row: 2,  text: 'DIRETORIA' },
+      { col: 5, row: 17,  text: 'CME' },
+      { col: 16, row: 17, text: 'COPA & NUTRICAO' },
+      { col: 30, row: 17, text: 'ENFERMARIA' },
+      { col: 45, row: 17, text: 'UTI ADULTO' },
+      { col: 63, row: 17, text: 'POSTO ENF. CENTRAL' },
+      { col: 7, row: 31,  text: 'AMBULATORIO' },
+      { col: 20, row: 31, text: 'MATERNIDADE' },
+      { col: 34, row: 31, text: 'ONCOLOGIA' },
+      { col: 48, row: 31, text: 'REABILITACAO' },
+      { col: 64, row: 31, text: 'SAUDE MENTAL' },
     ];
 
     for (const lbl of labels) {
@@ -633,8 +646,10 @@ export class GameScene extends Phaser.Scene {
 
   // ─── CAMERA ───────────────────────────────────────────────────────────────
   private setupCamera() {
+    // lerpX/Y=1 snaps camera to player each frame — correct for pixel-art and
+    // avoids sub-pixel interpolation math on every update.
     this.cameras.main
-      .startFollow(this.player, true, 0.18, 0.18)
+      .startFollow(this.player, true, 1, 1)
       .setZoom(CAMERA_ZOOM)
       .setBounds(0, 0, MAP_COLS * TILE_SIZE, MAP_ROWS * TILE_SIZE)
       .setRoundPixels(true);
@@ -787,7 +802,7 @@ export class GameScene extends Phaser.Scene {
       if (this.energyRestoreTimer >= 1500 && this.state.energy < 100) {
         this.energyRestoreTimer = 0;
         this.state.energy = Math.min(100, this.state.energy + 6);
-        this.showFloatingText(this.player.x, this.player.y - 30, '+6 ⚡', '#f1c40f');
+        this.showFloatingText(this.player.x, this.player.y - 30, '+6 NRG', '#f1c40f');
       }
       // Also reduce stress
       this.stressDecayTimer += delta;
@@ -868,9 +883,9 @@ export class GameScene extends Phaser.Scene {
           const mission = MISSIONS.find(m => m.id === id);
           if (!mission) continue;
           if (!wasInProgress && isInProgress && !isCompleted) {
-            this.showFloatingText(this.player.x, this.player.y - 60, `📋 Nova missão: ${mission.title}`, '#1abc9c', 18);
+            this.showFloatingText(this.player.x, this.player.y - 60, `[+] Nova missao: ${mission.title}`, '#1abc9c', 18);
           } else if (!wasCompleted && isCompleted) {
-            this.showFloatingText(this.player.x, this.player.y - 60, `✅ Concluída: ${mission.title}`, '#2ecc71', 18);
+            this.showFloatingText(this.player.x, this.player.y - 60, `[OK] Concluida: ${mission.title}`, '#2ecc71', 18);
           }
         }
       },
@@ -879,7 +894,7 @@ export class GameScene extends Phaser.Scene {
 
   private checkMilestones() {
     if (this.state.completedMissions.length === MISSIONS.length) {
-      this.showFloatingText(this.player.x, this.player.y - 60, '🏆 TODAS AS MISSÕES CONCLUÍDAS!', '#f1c40f', 24);
+      this.showFloatingText(this.player.x, this.player.y - 60, '[PARABENS] TODAS AS MISSOES CONCLUIDAS!', '#f1c40f', 24);
     }
   }
 

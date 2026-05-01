@@ -565,7 +565,7 @@ export const CRISIS_EVENTS: CrisisEvent[] = [
   },
   {
     id: 'queda_paciente',
-    title: '🛏️ QUEDA DE PACIENTE — Evento Adverso Notificado',
+    title: 'QUEDA DE PACIENTE — Evento Adverso Notificado',
     description: 'Um paciente caiu da cama na Enfermaria. Família está presente e exige explicações.',
     urgent: false,
     minCareerLevel: 0,
@@ -595,7 +595,7 @@ export const CRISIS_EVENTS: CrisisEvent[] = [
   },
   {
     id: 'superlotacao_ps',
-    title: '🏥 SUPERLOTAÇÃO — Pronto-Socorro em Colapso',
+    title: 'SUPERLOTACAO — Pronto-Socorro em Colapso',
     description: 'O PS tem 40% mais pacientes que a capacidade. Macas no corredor, equipe esgotada.',
     urgent: true,
     minCareerLevel: 1,
@@ -625,7 +625,7 @@ export const CRISIS_EVENTS: CrisisEvent[] = [
   },
   {
     id: 'erro_medicacao',
-    title: '💊 NEAR-MISS — Erro de Medicação Evitado',
+    title: 'NEAR-MISS — Erro de Medicação Evitado',
     description: 'Um técnico quase administrou a dose errada de heparina. Descoberto na conferência dupla.',
     urgent: false,
     minCareerLevel: 0,
