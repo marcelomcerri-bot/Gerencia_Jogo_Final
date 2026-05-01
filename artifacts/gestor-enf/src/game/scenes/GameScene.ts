@@ -49,6 +49,11 @@ export class GameScene extends Phaser.Scene {
   constructor() { super({ key: SCENES.GAME }); }
 
   create() {
+    // Raise the Arcade physics maxDelta from its default (1/60 s ≈ 16ms) to
+    // 100ms so that at 30fps the physics step uses the real ~33ms delta
+    // instead of being capped to half, which caused persistent 0.5x speed.
+    (this.physics.world as any).maxDelta = 0.1;
+
     this.state = loadGame();
     this.mapData = generateMapTiles();
 
