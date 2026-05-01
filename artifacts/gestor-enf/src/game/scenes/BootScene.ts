@@ -6,6 +6,13 @@ const SPR_W = 44;
 const SPR_H = 128;
 const FRAMES = 24; // 6 frames × 4 directions (down, up, right, left)
 
+// Size at which the sprite is drawn inside the 44×128 canvas.
+// Keeps the physics body offsets (feet at y≈110) unchanged while
+// making the visual character the same size as the old programmatic sprites.
+const DRAW_W = 34;  // visual width (centered in 44px canvas → 5px padding each side)
+const DRAW_H = 56;  // visual height (top-anchored, matches ~old groundY=54)
+const DRAW_X_OFF = Math.round((SPR_W - DRAW_W) / 2); // horizontal centering offset
+
 // New sprite sheet pixel coordinates (measured from 1704×923 source image)
 const FRAME_COLS = [
   { x1: 168, x2: 233 },
@@ -270,16 +277,20 @@ export class BootScene extends Phaser.Scene {
     const srcY = rowSpec[0];
     const srcW = colSpec.x2 - colSpec.x1 + 1;
     const srcH = rowSpec[1] - rowSpec[0] + 1;
-    const destX = gameFrame * SPR_W;
+    // Destination: draw the character into a DRAW_W×DRAW_H area
+    // centred horizontally and top-anchored inside the SPR_W×SPR_H canvas.
+    const slotX = gameFrame * SPR_W; // left edge of this frame slot in the atlas
+    const destX = slotX + DRAW_X_OFF;
+    const destY = 0;
 
     if (flipX) {
       ctx.save();
-      ctx.translate(destX + SPR_W, 0);
+      ctx.translate(slotX + SPR_W - DRAW_X_OFF, destY);
       ctx.scale(-1, 1);
-      ctx.drawImage(sheet, srcX, srcY, srcW, srcH, 0, 0, SPR_W, SPR_H);
+      ctx.drawImage(sheet, srcX, srcY, srcW, srcH, 0, 0, DRAW_W, DRAW_H);
       ctx.restore();
     } else {
-      ctx.drawImage(sheet, srcX, srcY, srcW, srcH, destX, 0, SPR_W, SPR_H);
+      ctx.drawImage(sheet, srcX, srcY, srcW, srcH, destX, destY, DRAW_W, DRAW_H);
     }
   }
 
