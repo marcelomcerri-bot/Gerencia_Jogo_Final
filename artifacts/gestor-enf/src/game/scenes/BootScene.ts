@@ -3,7 +3,7 @@ import { TILE_SIZE, SCENES } from '../constants';
 import { createTilesetTexture, NPC_DEFS } from '../data/gameData';
 
 const SPR_W = 44;
-const SPR_H = 64;
+const SPR_H = 128;
 const FRAMES = 12;
 
 function rrFill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
@@ -62,12 +62,19 @@ export class BootScene extends Phaser.Scene {
     const base = (import.meta as any).env?.BASE_URL || '/';
     this.load.image('huap_photo', `${base}assets/huap.png`);
     this.load.image('huap_pixelart', `${base}assets/huap_pixelart.png`);
+    this.load.image('nurses_sprite', `${base}assets/nurses_sprite.png`);
   }
 
   create() {
     createTilesetTexture(this);
-    this.createPlayerSprite();
-    this.createNPCSprites();
+    // Use new sprite-sheet-based character creation if texture loaded, else fallback
+    if (this.textures.exists('nurses_sprite')) {
+      this.createPlayerSpriteFromSheet();
+      this.createNPCSpritesFromSheet();
+    } else {
+      this.createPlayerSprite();
+      this.createNPCSprites();
+    }
     this.createPortraits();
     this.createPixelTexture();
     this.createLightTextures();
@@ -189,6 +196,135 @@ export class BootScene extends Phaser.Scene {
             isPlayer: false,
           });
         }
+      }
+      ct.refresh();
+      for (let i = 0; i < FRAMES; i++) ct.add(i, 0, i * SPR_W, 0, SPR_W, SPR_H);
+    }
+  }
+
+  // ── SPRITE SHEET CHARACTER CREATION ──────────────────────────────────────
+
+  /**
+   * Remove near-white background from the nurses sprite sheet so
+   * characters have transparent backgrounds in-game.
+   */
+  private buildTransparentSheet(img: HTMLImageElement): HTMLCanvasElement {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d')!;
+    ctx.drawImage(img, 0, 0);
+    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+    const px = imageData.data;
+    for (let i = 0; i < px.length; i += 4) {
+      const r = px[i], g = px[i + 1], b = px[i + 2];
+      const brightness = (r + g + b) / 3;
+      if (brightness > 238) {
+        px[i + 3] = 0; // fully transparent
+      } else if (brightness > 210) {
+        // smooth edge anti-aliasing
+        px[i + 3] = Math.round((238 - brightness) / 28 * 255);
+      }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+  }
+
+  /**
+   * Draw one character frame from the sprite sheet into the target canvas.
+   * sheetRow: 0=female, 1=male
+   * sheetCol: 0-4=front walk, 5-9=side walk (facing right)
+   * flipX: mirror horizontally (for left-facing)
+   */
+  private drawSheetFrame(
+    ctx: CanvasRenderingContext2D,
+    sheet: HTMLCanvasElement,
+    gameFrame: number,
+    sheetCol: number,
+    sheetRow: number,
+    flipX: boolean,
+  ) {
+    const COLS = 10, ROWS = 2;
+    const frameW = sheet.width / COLS;
+    const frameH = sheet.height / ROWS;
+    const srcX = sheetCol * frameW;
+    const srcY = sheetRow * frameH;
+    const destX = gameFrame * SPR_W;
+
+    if (flipX) {
+      ctx.save();
+      ctx.translate(destX + SPR_W, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(sheet, srcX, srcY, frameW, frameH, 0, 0, SPR_W, SPR_H);
+      ctx.restore();
+    } else {
+      ctx.drawImage(sheet, srcX, srcY, frameW, frameH, destX, 0, SPR_W, SPR_H);
+    }
+  }
+
+  private createPlayerSpriteFromSheet() {
+    const key = 'player';
+    if (this.textures.exists(key)) this.textures.remove(key);
+
+    const imgEl = this.textures.get('nurses_sprite').getSourceImage() as HTMLImageElement;
+    const sheet = this.buildTransparentSheet(imgEl);
+
+    const ct = this.textures.createCanvas(key, SPR_W * FRAMES, SPR_H) as Phaser.Textures.CanvasTexture;
+    const ctx = ct.getContext();
+
+    // Female nurse = row 0. Front cols 0-4, side cols 5-9 (facing right).
+    // Game frames: down(0-2), up(3-5), left(6-8), right(9-11)
+    // [gameFrame, sheetCol, sheetRow, flipX]
+    const map: [number, number, number, boolean][] = [
+      [0, 2, 0, false], // down idle
+      [1, 1, 0, false], // down step1
+      [2, 3, 0, false], // down step2
+      [3, 2, 0, false], // up idle (no back view, reuse front)
+      [4, 1, 0, false], // up step1
+      [5, 3, 0, false], // up step2
+      [6, 5, 0, true],  // left idle (side frame, flipped)
+      [7, 6, 0, true],  // left step1
+      [8, 7, 0, true],  // left step2
+      [9, 5, 0, false], // right idle (side frame)
+      [10, 6, 0, false],// right step1
+      [11, 7, 0, false],// right step2
+    ];
+
+    for (const [gf, sc, sr, fx] of map) {
+      this.drawSheetFrame(ctx, sheet, gf, sc, sr, fx);
+    }
+    ct.refresh();
+    for (let i = 0; i < FRAMES; i++) ct.add(i, 0, i * SPR_W, 0, SPR_W, SPR_H);
+  }
+
+  private createNPCSpritesFromSheet() {
+    const imgEl = this.textures.get('nurses_sprite').getSourceImage() as HTMLImageElement;
+    const sheet = this.buildTransparentSheet(imgEl);
+
+    // Male nurse = row 1. Same column layout as female.
+    const map: [number, number, number, boolean][] = [
+      [0, 2, 1, false],
+      [1, 1, 1, false],
+      [2, 3, 1, false],
+      [3, 2, 1, false],
+      [4, 1, 1, false],
+      [5, 3, 1, false],
+      [6, 5, 1, true],
+      [7, 6, 1, true],
+      [8, 7, 1, true],
+      [9, 5, 1, false],
+      [10, 6, 1, false],
+      [11, 7, 1, false],
+    ];
+
+    for (const def of NPC_DEFS) {
+      const key = def.spriteKey;
+      if (this.textures.exists(key)) this.textures.remove(key);
+      const ct = this.textures.createCanvas(key, SPR_W * FRAMES, SPR_H) as Phaser.Textures.CanvasTexture;
+      const ctx = ct.getContext();
+
+      for (const [gf, sc, sr, fx] of map) {
+        this.drawSheetFrame(ctx, sheet, gf, sc, sr, fx);
       }
       ct.refresh();
       for (let i = 0; i < FRAMES; i++) ct.add(i, 0, i * SPR_W, 0, SPR_W, SPR_H);

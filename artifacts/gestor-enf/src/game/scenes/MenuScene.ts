@@ -19,6 +19,11 @@ export class MenuScene extends Phaser.Scene {
 
   create() {
     this.starting = false;
+    // Ensure React router is on '/' so the home buttons always render,
+    // even when the page is hard-refreshed while the game was running.
+    this.time.delayedCall(120, () => {
+      (window as any).reactNavigate?.('/');
+    });
     const cx = GAME_WIDTH / 2;
     const cy = GAME_HEIGHT / 2;
 

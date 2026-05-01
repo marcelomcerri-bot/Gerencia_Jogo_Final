@@ -493,20 +493,47 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawNursingDesk(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
-    this.addPropCollision(bx, by, 64, 18);
-    g.fillStyle(0x000000, 0.2); g.fillRect(bx + 3, by + 3, 64, 18);
-    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx, by, 64, 14, 3); // counter top
-    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx, by + 14, 64, 4); // edge
-    // Two monitors
-    g.fillStyle(0x2c3e50, 1);
-    g.fillRect(bx + 8, by + 2, 14, 9);
-    g.fillRect(bx + 42, by + 2, 14, 9);
-    g.fillStyle(0x3498db, 0.7);
-    g.fillRect(bx + 9, by + 3, 12, 7);
-    g.fillRect(bx + 43, by + 3, 12, 7);
-    // Phone
-    g.fillStyle(0xe74c3c, 1); g.fillRoundedRect(bx + 28, by + 4, 8, 5, 1);
-    g.fillStyle(0x2c3e50, 1); g.fillRect(bx + 30, by + 5, 4, 1);
+    this.addPropCollision(bx, by, 70, 20);
+
+    // ── Drop shadow
+    g.fillStyle(0x000000, 0.18); g.fillRect(bx + 3, by + 3, 70, 20);
+
+    // ── Desk body (teal-accented, like reference image)
+    g.fillStyle(0x1abc9c, 1); g.fillRoundedRect(bx, by, 70, 18, 3); // teal front panel
+    g.fillStyle(0xe8f8f4, 1); g.fillRoundedRect(bx + 2, by + 2, 66, 12, 2); // cream work surface
+    g.fillStyle(0x16a085, 1); g.fillRect(bx, by + 14, 70, 4); // teal baseboard
+
+    // ── Left monitor
+    g.fillStyle(0x1a1a2e, 1); g.fillRoundedRect(bx + 6, by - 10, 18, 12, 2);
+    g.fillStyle(0x001020, 1); g.fillRect(bx + 7, by - 9, 16, 9);
+    // Monitor screen content (patient data look)
+    g.fillStyle(0x00ff88, 0.7); g.fillRect(bx + 8, by - 7, 8, 1); // header bar
+    g.fillStyle(0x00ccee, 0.5); g.fillRect(bx + 8, by - 5, 5, 1);
+    g.fillRect(bx + 8, by - 3, 7, 1);
+    g.fillRect(bx + 8, by - 1, 4, 1);
+    // Monitor stand
+    g.fillStyle(0x888888, 1); g.fillRect(bx + 14, by + 2, 2, 2);
+
+    // ── Right monitor
+    g.fillStyle(0x1a1a2e, 1); g.fillRoundedRect(bx + 44, by - 10, 18, 12, 2);
+    g.fillStyle(0x001020, 1); g.fillRect(bx + 45, by - 9, 16, 9);
+    g.fillStyle(0x00ff88, 0.7); g.fillRect(bx + 46, by - 7, 8, 1);
+    g.fillStyle(0x00ccee, 0.5); g.fillRect(bx + 46, by - 5, 5, 1);
+    g.fillRect(bx + 46, by - 3, 7, 1);
+    g.fillStyle(0x888888, 1); g.fillRect(bx + 52, by + 2, 2, 2);
+
+    // ── Clipboard on desk
+    g.fillStyle(0xf0f0e0, 1); g.fillRoundedRect(bx + 28, by + 3, 10, 8, 1);
+    g.fillStyle(0x888888, 1); g.fillRect(bx + 30, by + 4, 6, 1);
+    g.fillRect(bx + 30, by + 6, 6, 1);
+    g.fillRect(bx + 30, by + 8, 4, 1);
+
+    // ── Small desk plant (right side, teal pot)
+    g.fillStyle(0x1abc9c, 1); g.fillRoundedRect(bx + 62, by + 4, 6, 6, 1); // pot
+    g.fillStyle(0x27ae60, 1);
+    g.beginPath(); g.arc(bx + 65, by + 1, 5, 0, Math.PI * 2); g.fill();
+    g.fillStyle(0x2ecc71, 0.8);
+    g.beginPath(); g.arc(bx + 63, by + 3, 3, 0, Math.PI * 2); g.fill();
   }
 
   private drawExamTable(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
@@ -544,11 +571,34 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawPottedPlant(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
-    this.addPropCollision(bx + 6, by + 6, 20, 20);
-    g.fillStyle(0x000000, 0.2); g.fillCircle(bx + 16, by + 18, 12);
-    g.fillStyle(0x8e44ad, 1); g.fillRect(bx + 10, by + 12, 12, 14); // Pot
-    g.fillStyle(0x27ae60, 1); g.fillCircle(bx + 16, by + 8, 10); // Leaves
-    g.fillStyle(0x2ecc71, 1); g.fillCircle(bx + 12, by + 12, 8); // Leaves
+    this.addPropCollision(bx + 6, by + 14, 20, 18);
+    // ── Shadow
+    g.fillStyle(0x000000, 0.15); g.fillEllipse(bx + 16, by + 36, 22, 6);
+    // ── Pot (terracotta/brown — drawn as triangle approximation)
+    g.fillStyle(0x8b5e3c, 1);
+    g.fillTriangle(bx + 9, by + 24, bx + 25, by + 24, bx + 23, by + 36);
+    g.fillTriangle(bx + 9, by + 24, bx + 11, by + 36, bx + 23, by + 36);
+    // ── Pot rim
+    g.fillStyle(0xa0704a, 1); g.fillRoundedRect(bx + 8, by + 20, 18, 4, 2);
+    g.fillStyle(0xc0906a, 0.5); g.fillRect(bx + 9, by + 21, 16, 1); // highlight
+    // ── Soil (visible inside rim)
+    g.fillStyle(0x3a2010, 1); g.fillEllipse(bx + 17, by + 24, 14, 4);
+    // ── Tall tropical leaves (like the reference image plant)
+    // Main leaf left
+    g.fillStyle(0x27ae60, 1);
+    g.fillTriangle(bx + 16, by + 22, bx + 4, by - 2, bx + 12, by + 14);
+    // Main leaf right
+    g.fillTriangle(bx + 16, by + 22, bx + 28, by - 2, bx + 20, by + 14);
+    // Center leaf (tallest)
+    g.fillTriangle(bx + 16, by + 20, bx + 16, by - 8, bx + 20, by + 12);
+    // Secondary leaves
+    g.fillStyle(0x2ecc71, 1);
+    g.fillTriangle(bx + 16, by + 20, bx + 6, by + 6, bx + 14, by + 16);
+    g.fillTriangle(bx + 16, by + 20, bx + 26, by + 6, bx + 18, by + 16);
+    // Leaf vein highlights
+    g.lineStyle(0.8, 0x1a8a42, 0.5);
+    g.beginPath(); g.moveTo(bx + 16, by + 20); g.lineTo(bx + 10, by + 2); g.strokePath();
+    g.beginPath(); g.moveTo(bx + 16, by + 20); g.lineTo(bx + 22, by + 2); g.strokePath();
   }
 
   private drawFilingCabinet(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
@@ -580,34 +630,70 @@ export class GameScene extends Phaser.Scene {
 
   // --- Prop drawing routines (isometric-ish / top-down with shadow) ---
   private drawHospitalBed(g: Phaser.GameObjects.Graphics, bx: number, by: number, hasMonitor: boolean) {
-    this.addPropCollision(bx + 2, by + 2, 28, 44);
-    // Shadow
-    g.fillStyle(0x000000, 0.2); g.fillRoundedRect(bx + 5, by + 5, 26, 42, 4);
-    // Bed frame
-    g.fillStyle(0xbdc3c7, 1); g.fillRoundedRect(bx + 3, by + 2, 26, 44, 3);
-    // Mattress
-    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx + 5, by + 5, 22, 38, 2);
-    // Blanket (blue/green)
-    g.fillStyle(hasMonitor ? 0x16a085 : 0x2980b9, 0.85); g.fillRoundedRect(bx + 5, by + 20, 22, 23, 2);
-    // Pillow
-    g.fillStyle(0xffffff, 1); g.fillRoundedRect(bx + 7, by + 7, 18, 10, 3);
-    
-    // Patient (Head) - occasionally absent, but mostly present
-    if (Math.random() < 0.8) {
-      g.fillStyle(0xf5c5a3, 1); // skin color
-      g.beginPath(); g.arc(bx + 16, by + 12, 6, 0, Math.PI * 2); g.fill();
+    this.addPropCollision(bx + 2, by + 2, 28, 48);
+
+    // ── Drop shadow
+    g.fillStyle(0x000000, 0.18); g.fillRoundedRect(bx + 4, by + 6, 28, 48, 4);
+
+    // ── Bed frame (light metal/white)
+    g.fillStyle(0xe8e8e8, 1); g.fillRoundedRect(bx + 2, by + 2, 28, 48, 4);
+    g.fillStyle(0xd0d0d0, 1); g.fillRect(bx + 2, by + 44, 28, 6); // foot rail shadow
+
+    // ── Head rail (teal bar, like reference)
+    g.fillStyle(0x1abc9c, 1); g.fillRoundedRect(bx + 2, by + 2, 28, 4, 2);
+
+    // ── Mattress
+    g.fillStyle(0xf8f8f8, 1); g.fillRoundedRect(bx + 4, by + 6, 24, 40, 2);
+
+    // ── Pillow (white)
+    g.fillStyle(0xffffff, 1); g.fillRoundedRect(bx + 6, by + 8, 20, 10, 3);
+    g.fillStyle(0xdde8e8, 0.5); g.fillRect(bx + 7, by + 9, 18, 1); // pillow crease
+
+    // ── Teal blanket (matches reference — 1abc9c teal)
+    const blanketColor = hasMonitor ? 0x16a085 : 0x1abc9c;
+    g.fillStyle(blanketColor, 0.88); g.fillRoundedRect(bx + 4, by + 24, 24, 22, 2);
+    // Blanket fold highlight
+    g.fillStyle(0xffffff, 0.18); g.fillRect(bx + 4, by + 24, 24, 2);
+
+    // ── Awareness ribbon on blanket (small loop, white)
+    g.fillStyle(0xffffff, 0.55);
+    g.fillRoundedRect(bx + 12, by + 30, 8, 6, 3);
+    g.fillStyle(blanketColor, 0.88); g.fillRoundedRect(bx + 14, by + 32, 4, 3, 1);
+
+    // ── Patient head
+    if (Math.random() < 0.75) {
+      g.fillStyle(0xf5c5a3, 1);
+      g.beginPath(); g.arc(bx + 16, by + 13, 5, 0, Math.PI * 2); g.fill();
+      // Hair
+      g.fillStyle(0x4a3020, 1);
+      g.fillRect(bx + 11, by + 8, 10, 4);
+      g.beginPath(); g.arc(bx + 16, by + 13, 5, Math.PI, 0); g.fill();
     }
 
-    // Bedside table
-    g.fillStyle(0x95a5a6, 1); g.fillRect(bx - 10, by + 4, 10, 12);
-    
+    // ── Foot rail (silver bar)
+    g.fillStyle(0xc0c8c8, 1); g.fillRect(bx + 4, by + 48, 24, 3);
+
+    // ── Bedside table (right side)
+    g.fillStyle(0xd8e0e0, 1); g.fillRoundedRect(bx + 32, by + 8, 12, 14, 2);
+    g.fillStyle(0xc8d0d0, 1); g.fillRect(bx + 32, by + 20, 12, 2);
+
+    // ── Monitor with heart-rate waveform
     if (hasMonitor) {
-      // Monitor
-      g.fillStyle(0x2c3e50, 1); g.fillRect(bx - 9, by + 2, 8, 10);
-      g.fillStyle(0x00ff88, 0.5); g.fillRect(bx - 8, by + 3, 6, 6);
-      
-      const led = this.add.sprite(bx - 5 + 0.5, by + 1 + 0.5, 'red_led').setDepth(3).setOrigin(0.5);
-      this.tweens.add({ targets: led, alpha: 0.1, duration: 600, yoyo: true, repeat: -1 });
+      // Monitor stand (on bedside table)
+      g.fillStyle(0x2c3e50, 1); g.fillRect(bx + 34, by - 2, 10, 8);
+      g.fillStyle(0x111111, 1); g.fillRoundedRect(bx + 33, by - 4, 12, 8, 2);
+      // Screen (green waveform)
+      g.fillStyle(0x001800, 1); g.fillRect(bx + 34, by - 3, 10, 6);
+      g.fillStyle(0x00ff88, 0.9);
+      g.fillRect(bx + 34, by, 2, 1);
+      g.fillRect(bx + 36, by - 2, 1, 4);
+      g.fillRect(bx + 37, by + 1, 2, 1);
+      g.fillRect(bx + 39, by, 1, 1);
+      g.fillRect(bx + 40, by - 1, 1, 2);
+      g.fillRect(bx + 41, by, 2, 1);
+
+      const led = this.add.sprite(bx + 43, by - 4, 'red_led').setDepth(3).setOrigin(0.5);
+      this.tweens.add({ targets: led, alpha: 0.1, duration: 500, yoyo: true, repeat: -1 });
     }
   }
 

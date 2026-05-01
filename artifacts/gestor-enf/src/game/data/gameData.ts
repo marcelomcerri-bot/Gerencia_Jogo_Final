@@ -164,6 +164,29 @@ export function createTilesetTexture(scene: Phaser.Scene) {
     ctx.lineTo(x + half, half + half * 0.55); ctx.closePath(); ctx.fill();
   };
 
+  /**
+   * Clean pixel-art floor tile matching the reference UTI image style:
+   * bright uniform base color + thin grout line + subtle top-left specular.
+   */
+  const pixelArtFloor = (x: number, base: string, grout: string, highlightAlpha = 0.15) => {
+    ctx.fillStyle = base;
+    ctx.fillRect(x, 0, W, W);
+    // Thin grout lines (1px border + center cross)
+    ctx.strokeStyle = grout; ctx.lineWidth = 1; ctx.globalAlpha = 0.5;
+    ctx.strokeRect(x + 0.5, 0.5, W - 1, W - 1);
+    ctx.globalAlpha = 1;
+    // Specular highlight — small triangle top-left
+    ctx.fillStyle = `rgba(255,255,255,${highlightAlpha})`;
+    ctx.beginPath();
+    ctx.moveTo(x, 0); ctx.lineTo(x + W * 0.45, 0); ctx.lineTo(x, W * 0.45);
+    ctx.closePath(); ctx.fill();
+    // Bottom-right subtle shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    ctx.beginPath();
+    ctx.moveTo(x + W, W); ctx.lineTo(x + W - W * 0.35, W); ctx.lineTo(x + W, W - W * 0.35);
+    ctx.closePath(); ctx.fill();
+  };
+
   /** Wainscot-patterned wall (horizontal relief bands) */
   const wallTile = (x: number, topCol: string, bandLight: string, bandDark: string, baseCol: string) => {
     // Full background
@@ -232,199 +255,123 @@ export function createTilesetTexture(scene: Phaser.Scene) {
     wallTile(x, '#f2ede0', '#faf8f0', '#ccc5b0', '#c0b89a');
   });
 
-  /** 2 — CORRIDOR: polished large white/cream tiles */
+  /** 2 — CORRIDOR: bright cream tile (clean hospital look) */
   drawTile(TILE_ID.CORRIDOR, x => {
-    bigTileFloor(x, '#f4f0e2', '#eee9d6', '#bbb5a0', 0.22);
-    // Extra diagonal sheen
-    ctx.fillStyle = 'rgba(255,255,255,0.12)';
-    ctx.beginPath();
-    ctx.moveTo(x + W - 5, 0); ctx.lineTo(x + W, 0);
-    ctx.lineTo(x + 5, W); ctx.lineTo(x, W);
-    ctx.closePath(); ctx.fill();
+    pixelArtFloor(x, '#f5f1e8', '#c8c0a8', 0.18);
   });
 
-  /** 3 — ICU: clinical ice-blue polished */
+  /** 3 — ICU: clinical bright white with subtle teal grout (matches reference image) */
   drawTile(TILE_ID.ICU, x => {
-    bigTileFloor(x, '#bde8f2', '#aadfea', '#7abbc8', 0.28);
-    // Medical cross watermark
-    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    pixelArtFloor(x, '#f0f8f8', '#9ecece', 0.20);
+    // Very subtle cross watermark
+    ctx.fillStyle = 'rgba(26,188,156,0.07)';
     ctx.fillRect(x + 13, 6, 6, 20); ctx.fillRect(x + 6, 13, 20, 6);
   });
 
-  /** 4 — PHARMACY: lavender with green cross */
+  /** 4 — PHARMACY: clean lavender tile */
   drawTile(TILE_ID.PHARMACY, x => {
-    bigTileFloor(x, '#c8aaec', '#be9ee4', '#9878c0', 0.18);
-    ctx.fillStyle = 'rgba(60,200,100,0.3)';
-    ctx.fillRect(x + 13, 6, 6, 20); ctx.fillRect(x + 6, 13, 20, 6);
+    pixelArtFloor(x, '#ede8f8', '#b8a8d8', 0.15);
+    // Small green cross
+    ctx.fillStyle = 'rgba(46,204,113,0.25)';
+    ctx.fillRect(x + 14, 8, 4, 16); ctx.fillRect(x + 8, 14, 16, 4);
   });
 
-  /** 5 — ADMIN: warm parquet wood */
+  /** 5 — ADMIN: warm parquet wood planks */
   drawTile(TILE_ID.ADMIN, x => {
     ctx.fillStyle = '#9b6b42'; ctx.fillRect(x, 0, W, W);
-    // Plank rows
     const plankH = 8;
     const plankCols = ['#9b6b42','#8c5e38','#a8734a','#956342'];
     for (let row = 0; row < Math.ceil(W / plankH); row++) {
       ctx.fillStyle = plankCols[row % plankCols.length];
       ctx.fillRect(x, row * plankH, W, plankH - 1);
-      // Plank seams (alternating offset)
       const offset = row % 2 === 0 ? 0 : W / 2;
       ctx.fillStyle = 'rgba(0,0,0,0.2)';
       for (let seg = offset; seg < W + W / 2; seg += W / 2) {
         if (seg < W) ctx.fillRect(x + seg, row * plankH, 1, plankH - 1);
       }
     }
-    // Varnish sheen
     ctx.fillStyle = 'rgba(255,200,100,0.08)';
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + W / 3, 0); ctx.lineTo(x, W / 3); ctx.closePath(); ctx.fill();
   });
 
-  /** 6 — WARD: soft lavender with large diamond motif */
+  /** 6 — WARD: soft lavender tile */
   drawTile(TILE_ID.WARD, x => {
-    bigTileFloor(x, '#dcd0f2', '#d0c5ec', '#a898c8', 0.14);
-    ctx.fillStyle = 'rgba(150,130,220,0.12)';
-    ctx.beginPath();
-    ctx.moveTo(x + W / 2, 2); ctx.lineTo(x + W - 2, W / 2);
-    ctx.lineTo(x + W / 2, W - 2); ctx.lineTo(x + 2, W / 2);
-    ctx.closePath(); ctx.fill();
+    pixelArtFloor(x, '#ede8f5', '#b8a8cc', 0.14);
   });
 
-  /** 7 — BREAK/NUTRITION: white kitchen tiles */
+  /** 7 — BREAK/NUTRITION: clean white tile */
   drawTile(TILE_ID.BREAK, x => {
-    bigTileFloor(x, '#f5f5f0', '#ececea', '#aaaaaa', 0.1);
-    // Subtle food accent dots
-    const accents = [[6,6],[22,6],[6,22],[22,22]];
-    for (const [ax, ay] of accents) {
-      ctx.fillStyle = 'rgba(200,160,80,0.15)';
-      ctx.beginPath(); ctx.arc(x + ax, ay, 2, 0, Math.PI * 2); ctx.fill();
-    }
+    pixelArtFloor(x, '#f8f8f5', '#b8b8b0', 0.12);
   });
 
-  /** 8 — NURSING: mint-green with H motif */
+  /** 8 — NURSING: mint/teal tile */
   drawTile(TILE_ID.NURSING, x => {
-    bigTileFloor(x, '#9eecd0', '#8ee4c4', '#55b888', 0.2);
-    // Hospital H watermark
-    ctx.fillStyle = 'rgba(30,160,100,0.18)';
-    ctx.fillRect(x + 8, 8, 4, 16); ctx.fillRect(x + 20, 8, 4, 16);
-    ctx.fillRect(x + 8, 14, 16, 4);
+    pixelArtFloor(x, '#e8f8f0', '#88c8a8', 0.18);
+    ctx.fillStyle = 'rgba(26,188,156,0.12)';
+    ctx.fillRect(x + 9, 9, 4, 14); ctx.fillRect(x + 19, 9, 4, 14);
+    ctx.fillRect(x + 9, 15, 14, 4);
   });
 
-  /** 9 — RECEPTION: warm golden cream */
+  /** 9 — RECEPTION: warm golden cream tile */
   drawTile(TILE_ID.RECEPTION, x => {
-    bigTileFloor(x, '#fff0b8', '#f8e8a0', '#c0a030', 0.2);
-    // Welcome diamond
-    ctx.fillStyle = 'rgba(200,150,20,0.1)';
-    ctx.beginPath();
-    ctx.moveTo(x + W / 2, 2); ctx.lineTo(x + W - 2, W / 2);
-    ctx.lineTo(x + W / 2, W - 2); ctx.lineTo(x + 2, W / 2);
-    ctx.closePath(); ctx.fill();
+    pixelArtFloor(x, '#fdf5d8', '#c8a840', 0.20);
   });
 
-  /** 10 — EMERGENCY: urgent red chevrons */
+  /** 10 — EMERGENCY: urgent warm red tile */
   drawTile(TILE_ID.EMERGENCY, x => {
-    ctx.fillStyle = '#f8a8a8'; ctx.fillRect(x, 0, W, W);
-    ctx.fillStyle = '#f09090'; ctx.fillRect(x, W / 2, W, W / 2);
-    // Alert chevrons
-    ctx.fillStyle = 'rgba(200,30,30,0.18)';
-    for (let row = 0; row < 2; row++) {
-      ctx.beginPath();
-      ctx.moveTo(x + 0, row * 16 + 4);
-      ctx.lineTo(x + 8, row * 16 + 10);
-      ctx.lineTo(x + 0, row * 16 + 16);
-      ctx.lineTo(x + 4, row * 16 + 16);
-      ctx.lineTo(x + 12, row * 16 + 10);
-      ctx.lineTo(x + 4, row * 16 + 4);
-      ctx.closePath(); ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(x + 12, row * 16 + 4);
-      ctx.lineTo(x + 20, row * 16 + 10);
-      ctx.lineTo(x + 12, row * 16 + 16);
-      ctx.lineTo(x + 16, row * 16 + 16);
-      ctx.lineTo(x + 24, row * 16 + 10);
-      ctx.lineTo(x + 16, row * 16 + 4);
-      ctx.closePath(); ctx.fill();
-    }
-    // Grout
-    ctx.strokeStyle = '#d04040'; ctx.lineWidth = 0.5; ctx.globalAlpha = 0.3;
-    ctx.strokeRect(x + 0.5, 0.5, W - 1, W - 1);
-    ctx.beginPath(); ctx.moveTo(x + W/2, 0); ctx.lineTo(x + W/2, W); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x, W/2); ctx.lineTo(x + W, W/2); ctx.stroke();
-    ctx.globalAlpha = 1;
+    pixelArtFloor(x, '#fde8e8', '#d04040', 0.1);
+    // Emergency cross stripe
+    ctx.fillStyle = 'rgba(200,40,40,0.12)';
+    ctx.fillRect(x + 13, 2, 6, W - 4); ctx.fillRect(x + 2, 13, W - 4, 6);
   });
 
-  /** 11 — LAB: clean blue-white */
+  /** 11 — LAB: clean blue-white tile */
   drawTile(TILE_ID.LAB, x => {
-    bigTileFloor(x, '#c8dcf8', '#bcd4f4', '#8090c0', 0.2);
-    // Hex/molecule motif
-    ctx.strokeStyle = 'rgba(80,120,220,0.15)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(x + W/2, W/2, 7, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x + W/2, W/2, 3, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = 'rgba(80,120,220,0.1)';
-    ctx.beginPath(); ctx.arc(x + W/2, W/2, 3, 0, Math.PI * 2); ctx.fill();
+    pixelArtFloor(x, '#e8f0fd', '#8090c0', 0.18);
   });
 
-  /** 12 — RADIOLOGY: deep blue */
+  /** 12 — RADIOLOGY: deep blue tile */
   drawTile(TILE_ID.RADIOLOGY, x => {
-    bigTileFloor(x, '#b8c8f8', '#aabcf0', '#6070a0', 0.22);
-    // X-ray cross-hairs
-    ctx.strokeStyle = 'rgba(60,80,200,0.12)'; ctx.lineWidth = 0.8;
-    ctx.beginPath(); ctx.moveTo(x + W/2, 0); ctx.lineTo(x + W/2, W); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x, W/2); ctx.lineTo(x + W, W/2); ctx.stroke();
+    pixelArtFloor(x, '#e8ecfc', '#6070a0', 0.20);
   });
 
-  /** 13 — CME: sterile grey-white */
+  /** 13 — CME: sterile grey-white tile */
   drawTile(TILE_ID.CME, x => {
-    bigTileFloor(x, '#e8ecf4', '#dde2ee', '#9098b0', 0.15);
-    // Sterilization concentric circles
-    ctx.strokeStyle = 'rgba(80,100,150,0.12)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(x + W/2, W/2, 9, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(x + W/2, W/2, 5, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = 'rgba(80,100,150,0.08)';
-    ctx.beginPath(); ctx.arc(x + W/2, W/2, 5, 0, Math.PI * 2); ctx.fill();
+    pixelArtFloor(x, '#f0f0f4', '#9098b0', 0.14);
   });
 
-  /** 14 — MATERNITY: soft rosy pink */
+  /** 14 — MATERNITY: soft rosy pink tile */
   drawTile(TILE_ID.MATERNITY, x => {
-    bigTileFloor(x, '#fcc8d4', '#f8bcc8', '#c87898', 0.15);
+    pixelArtFloor(x, '#fce8ee', '#c87898', 0.14);
     // Heart watermark
-    ctx.fillStyle = 'rgba(220,80,120,0.12)';
+    ctx.fillStyle = 'rgba(220,80,120,0.10)';
     const hx = x + W/2, hy = W/2;
     ctx.beginPath(); ctx.arc(hx - 4, hy - 2, 4, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.arc(hx + 4, hy - 2, 4, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.moveTo(hx - 8, hy); ctx.lineTo(hx, hy + 8); ctx.lineTo(hx + 8, hy); ctx.closePath(); ctx.fill();
   });
 
-  /** 15 — ONCOLOGY: teal mint */
+  /** 15 — ONCOLOGY: teal mint tile */
   drawTile(TILE_ID.ONCOLOGY, x => {
-    bigTileFloor(x, '#a8ecd4', '#9ce4c8', '#44a878', 0.18);
-    // Ribbon motif
-    ctx.strokeStyle = 'rgba(30,140,100,0.18)'; ctx.lineWidth = 1.5;
+    pixelArtFloor(x, '#e8f8f0', '#44a878', 0.18);
+    // Ribbon awareness loop
+    ctx.strokeStyle = 'rgba(26,188,156,0.2)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(x + W/2, W/2, 8, 0, Math.PI * 2); ctx.stroke();
   });
 
-  /** 16 — REHAB: warm yellow */
+  /** 16 — REHAB: warm yellow tile */
   drawTile(TILE_ID.REHAB, x => {
-    bigTileFloor(x, '#fef0a8', '#f8e490', '#c0a020', 0.15);
-    // Dumbbell / motion lines
-    ctx.fillStyle = 'rgba(170,130,10,0.12)';
-    ctx.fillRect(x + 8, W/2 - 2, 16, 4);
-    ctx.beginPath(); ctx.arc(x + 8, W/2, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(x + 24, W/2, 4, 0, Math.PI * 2); ctx.fill();
+    pixelArtFloor(x, '#fdf8e0', '#c0a020', 0.15);
   });
 
-  /** 17 — OUTPATIENT: sky blue */
+  /** 17 — OUTPATIENT: soft sky-blue tile */
   drawTile(TILE_ID.OUTPATIENT, x => {
-    bigTileFloor(x, '#c8e8f8', '#bce0f4', '#6090b0', 0.18);
+    pixelArtFloor(x, '#eaf4fc', '#6090b0', 0.18);
   });
 
-  /** 18 — PSYCH: soothing lavender */
+  /** 18 — PSYCH: soothing lavender tile */
   drawTile(TILE_ID.PSYCH, x => {
-    bigTileFloor(x, '#e4ccf8', '#dcc0f4', '#9060c0', 0.12);
-    // Calming spiral
-    ctx.strokeStyle = 'rgba(130,60,200,0.1)'; ctx.lineWidth = 1.2;
-    for (let r = 10; r >= 2; r -= 3) {
-      ctx.beginPath(); ctx.arc(x + W/2, W/2, r, 0, Math.PI * 1.8); ctx.stroke();
-    }
+    pixelArtFloor(x, '#f0e8fc', '#9060c0', 0.12);
   });
 
   ct.refresh();

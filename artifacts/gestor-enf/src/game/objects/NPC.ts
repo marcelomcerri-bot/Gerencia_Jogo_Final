@@ -39,8 +39,9 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(10);
 
     const body = this.body as Phaser.Physics.Arcade.Body;
+    // Offset tuned for 44×128 sprite (feet near bottom)
     body.setSize(16, 14);
-    body.setOffset(14, 46);
+    body.setOffset(14, 110);
     body.setImmovable(false);
     this.setFrame(0);
 
