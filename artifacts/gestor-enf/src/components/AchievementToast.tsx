@@ -18,6 +18,7 @@ export function AchievementToast({ achievement, onDone }: AchievementToastProps)
       }, 3000);
       return () => clearTimeout(t);
     }
+    return undefined;
   }, [achievement]);
 
   return (

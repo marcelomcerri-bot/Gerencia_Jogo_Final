@@ -140,270 +140,291 @@ export function createTilesetTexture(scene: Phaser.Scene) {
   const ct = scene.textures.createCanvas(key, W * NUM_TILES, W) as Phaser.Textures.CanvasTexture;
   const ctx = ct.getContext();
 
-  const drawTile = (i: number, cb: (x: number) => void) => {
-    const x = i * W;
-    cb(x);
-  };
+  const drawTile = (i: number, cb: (x: number) => void) => { cb(i * W); };
 
-  // Helper: draw subtle grid lines
-  const gridLines = (ctx: CanvasRenderingContext2D, x: number, gridColor: string, alpha = 0.12) => {
-    ctx.strokeStyle = gridColor;
-    ctx.globalAlpha = alpha;
-    ctx.lineWidth = 0.5;
-    for (let gx = x; gx < x + W; gx += 8) {
-      ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, W); ctx.stroke();
-    }
-    for (let gy = 0; gy < W; gy += 8) {
-      ctx.beginPath(); ctx.moveTo(x, gy); ctx.lineTo(x + W, gy); ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-  };
-
-  // Helper: checker pattern
-  const checker = (ctx: CanvasRenderingContext2D, x: number, c1: string, c2: string, size = 8) => {
-    for (let row = 0; row < W / size; row++) {
-      for (let col = 0; col < W / size; col++) {
-        ctx.fillStyle = (row + col) % 2 === 0 ? c1 : c2;
-        ctx.fillRect(x + col * size, row * size, size, size);
-      }
-    }
-  };
-
-  // 0: GARDEN
-  drawTile(TILE_ID.GARDEN, x => {
-    ctx.fillStyle = '#5aa96a'; ctx.fillRect(x, 0, W, W);
-    // Grass texture
-    ctx.fillStyle = '#4a9058';
-    for (let j = 0; j < 20; j++) {
-      const gx = (j * 37) % (W - 2); const gy = (j * 23) % (W - 4);
-      ctx.fillRect(x + gx, gy, 1, 3);
-    }
-    // Occasional flowers
-    if (Math.random() > 0.6) {
-      ctx.fillStyle = Math.random() > 0.5 ? '#ffb3ba' : '#fff9b0';
-      const fx = 4 + (Math.random() * (W - 8)) | 0;
-      const fy = 4 + (Math.random() * (W - 8)) | 0;
-      ctx.fillRect(x + fx, fy, 3, 3);
-    }
-  });
-
-  // 1: WALL - clean hospital wall with wainscoting
-  drawTile(TILE_ID.WALL, x => {
-    // Floor area behind the wall (minimal)
-    ctx.fillStyle = '#0a0a0a'; ctx.fillRect(x, 0, W, W);
-    
-    // Front face (Wall protruding up into the camera)
-    ctx.fillStyle = '#f0ede4'; ctx.fillRect(x, 0, W, W - 8);
-    
-    // Wainscoting pattern (horizontal bands)
-    ctx.fillStyle = '#e8e4d8';
-    for (let row = 0; row < 3; row++) {
-      const ox = row % 2 === 0 ? 0 : 8;
-      for (let bx = ox; bx < W; bx += 16) {
-        ctx.fillRect(x + bx, row * 8, 14, 6);
-      }
-    }
-    
-    // Top molding strip (3D depth cue)
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(x, 0, W, 3);
-    ctx.fillStyle = '#d4cfc0'; ctx.fillRect(x, 3, W, 1);
-    
-    // Baseboard and 3D floor cutoff
-    ctx.fillStyle = '#c8c0b0'; ctx.fillRect(x, W - 12, W, 4);
-    ctx.fillStyle = '#a09880'; ctx.fillRect(x, W - 8, W, 2);
-    
-    // Depth shadow going down to the floor
-    const grad = ctx.createLinearGradient(x, W - 6, x, W);
-    grad.addColorStop(0, 'rgba(0,0,0,0.8)');
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(x, W - 6, W, 6);
-  });
-
-  // 2: CORRIDOR - warm marble/linoleum
-  drawTile(TILE_ID.CORRIDOR, x => {
-    ctx.fillStyle = '#ede8d8'; ctx.fillRect(x, 0, W, W);
-    // Large tile grid
-    ctx.strokeStyle = '#d8d2c0'; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.8;
+  /** Large-format polished floor tiles — classic hospital look */
+  const bigTileFloor = (x: number, c1: string, c2: string, grout = '#9aa', glossAlpha = 0.18) => {
+    const half = W / 2;
+    ctx.fillStyle = c1; ctx.fillRect(x, 0, half, half);
+    ctx.fillStyle = c2; ctx.fillRect(x + half, 0, half, half);
+    ctx.fillStyle = c2; ctx.fillRect(x, half, half, half);
+    ctx.fillStyle = c1; ctx.fillRect(x + half, half, half, half);
+    // Grout lines
+    ctx.strokeStyle = grout; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.55;
     ctx.strokeRect(x + 0.5, 0.5, W - 1, W - 1);
-    ctx.strokeRect(x + W/2, 0, 0.5, W);
-    ctx.strokeRect(x, W/2, W, 0.5);
+    ctx.beginPath(); ctx.moveTo(x + half, 0); ctx.lineTo(x + half, W); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, half); ctx.lineTo(x + W, half); ctx.stroke();
     ctx.globalAlpha = 1;
-    // Highlight on top-left
-    ctx.fillStyle = '#f8f4e8'; ctx.fillRect(x, 0, W/2, W/2);
-    ctx.fillStyle = '#ede8d8'; ctx.fillRect(x, 0, W/2, W/2);
-    // Center dot accent
-    ctx.fillStyle = '#d4cebc'; ctx.fillRect(x + 14, 14, 4, 4);
-    
-    // Diagonal Glossy reflection line effect
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
-    ctx.beginPath(); ctx.moveTo(x+W-8, 0); ctx.lineTo(x+W, 0); ctx.lineTo(x+8, W); ctx.lineTo(x, W); ctx.fill();
+    // Specular gloss highlight (top-left corner of each tile)
+    ctx.fillStyle = `rgba(255,255,255,${glossAlpha})`;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + half * 0.55, 0);
+    ctx.lineTo(x, half * 0.55); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + half, half);
+    ctx.lineTo(x + half + half * 0.55, half);
+    ctx.lineTo(x + half, half + half * 0.55); ctx.closePath(); ctx.fill();
+  };
+
+  /** Wainscot-patterned wall (horizontal relief bands) */
+  const wallTile = (x: number, topCol: string, bandLight: string, bandDark: string, baseCol: string) => {
+    // Full background
+    ctx.fillStyle = topCol; ctx.fillRect(x, 0, W, W);
+    // Raised wainscot panels (3 bands)
+    const bands = 3;
+    const bh = Math.floor((W - 4) / bands);
+    for (let b = 0; b < bands; b++) {
+      const by = b * bh + 1;
+      const ox = b % 2 === 0 ? 0 : W / 2;
+      for (let bx = ox; bx < W + W / 2; bx += W) {
+        if (bx >= W) break;
+        const pw = Math.min(W / 2 - 2, W - bx - 1);
+        if (pw <= 0) continue;
+        // Panel highlight top
+        ctx.fillStyle = bandLight; ctx.fillRect(x + bx, by, pw, 1);
+        // Panel body
+        ctx.fillStyle = topCol; ctx.fillRect(x + bx + 1, by + 1, pw - 2, bh - 3);
+        // Panel shadow bottom
+        ctx.fillStyle = bandDark; ctx.fillRect(x + bx, by + bh - 2, pw, 2);
+      }
+    }
+    // Top edge / crown molding
+    ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.fillRect(x, 0, W, 2);
+    ctx.fillStyle = bandDark; ctx.fillRect(x, 2, W, 1);
+    // Baseboard
+    ctx.fillStyle = baseCol; ctx.fillRect(x, W - 6, W, 4);
+    ctx.fillStyle = bandDark; ctx.fillRect(x, W - 2, W, 2);
+    // Depth shadow at base
+    const shadowGrad = ctx.createLinearGradient(x, W - 8, x, W);
+    shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    shadowGrad.addColorStop(1, 'rgba(0,0,0,0.55)');
+    ctx.fillStyle = shadowGrad; ctx.fillRect(x, W - 8, W, 8);
+  };
+
+  /** 0 — GARDEN: rich grass with blade texture */
+  drawTile(TILE_ID.GARDEN, x => {
+    // Base green
+    const g = ctx.createLinearGradient(x, 0, x, W);
+    g.addColorStop(0, '#4a9a58'); g.addColorStop(1, '#3d8549');
+    ctx.fillStyle = g; ctx.fillRect(x, 0, W, W);
+    // Blades (deterministic pseudo-random)
+    const seeds = [3,11,19,7,23,5,17,29,13,2,8,25,15,27,6,21,4,16,10,22];
+    for (let j = 0; j < seeds.length; j++) {
+      const gx = (seeds[j] * 31 + j * 7) % (W - 2);
+      const gy = (seeds[j] * 17 + j * 11) % (W - 5);
+      ctx.fillStyle = j % 3 === 0 ? '#5db46a' : (j % 3 === 1 ? '#3a7a46' : '#6ec47a');
+      ctx.fillRect(x + gx, gy, 1, 3 + (j % 3));
+    }
+    // Flowers (deterministic)
+    const flowerPos = [[4,6],[20,3],[8,22],[26,14],[13,27],[29,9]];
+    const flowerCols = ['#ffb3ba','#fff9b0','#ffccaa','#c8e8ff','#ffaaee','#aaffcc'];
+    for (let f = 0; f < flowerPos.length; f++) {
+      ctx.fillStyle = flowerCols[f % flowerCols.length];
+      ctx.fillRect(x + flowerPos[f][0], flowerPos[f][1], 2, 2);
+      // Center
+      ctx.fillStyle = '#ffff88';
+      ctx.fillRect(x + flowerPos[f][0] + 0, flowerPos[f][1] + 0, 1, 1);
+    }
+    // Path: subtle soil strip at bottom edge
+    ctx.fillStyle = 'rgba(120,80,40,0.1)'; ctx.fillRect(x, W - 3, W, 3);
   });
 
-  // 3: ICU - clinical blue
+  /** 1 — WALL */
+  drawTile(TILE_ID.WALL, x => {
+    wallTile(x, '#f2ede0', '#faf8f0', '#ccc5b0', '#c0b89a');
+  });
+
+  /** 2 — CORRIDOR: polished large white/cream tiles */
+  drawTile(TILE_ID.CORRIDOR, x => {
+    bigTileFloor(x, '#f4f0e2', '#eee9d6', '#bbb5a0', 0.22);
+    // Extra diagonal sheen
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(x + W - 5, 0); ctx.lineTo(x + W, 0);
+    ctx.lineTo(x + 5, W); ctx.lineTo(x, W);
+    ctx.closePath(); ctx.fill();
+  });
+
+  /** 3 — ICU: clinical ice-blue polished */
   drawTile(TILE_ID.ICU, x => {
-    checker(ctx, x, '#b8e8ee', '#aadde4');
-    // Cross symbol
-    ctx.fillStyle = 'rgba(255,255,255,0.35)';
-    ctx.fillRect(x + 13, 8, 6, 16); ctx.fillRect(x + 8, 13, 16, 6);
-    gridLines(ctx, x, '#89c8d0');
+    bigTileFloor(x, '#bde8f2', '#aadfea', '#7abbc8', 0.28);
+    // Medical cross watermark
+    ctx.fillStyle = 'rgba(255,255,255,0.22)';
+    ctx.fillRect(x + 13, 6, 6, 20); ctx.fillRect(x + 6, 13, 20, 6);
   });
 
-  // 4: PHARMACY - purple/green cross
+  /** 4 — PHARMACY: lavender with green cross */
   drawTile(TILE_ID.PHARMACY, x => {
-    ctx.fillStyle = '#c4a8e0'; ctx.fillRect(x, 0, W, W);
-    ctx.fillStyle = '#b898d0'; ctx.fillRect(x, 0, W/2, W/2);
-    ctx.fillStyle = '#c4a8e0'; ctx.fillRect(x + W/2, W/2, W/2, W/2);
-    // Green cross
-    ctx.fillStyle = 'rgba(80,200,100,0.5)';
-    ctx.fillRect(x + 13, 7, 6, 18); ctx.fillRect(x + 7, 13, 18, 6);
-    gridLines(ctx, x, '#9878b8');
+    bigTileFloor(x, '#c8aaec', '#be9ee4', '#9878c0', 0.18);
+    ctx.fillStyle = 'rgba(60,200,100,0.3)';
+    ctx.fillRect(x + 13, 6, 6, 20); ctx.fillRect(x + 6, 13, 20, 6);
   });
 
-  // 5: ADMIN - warm wood floor
+  /** 5 — ADMIN: warm parquet wood */
   drawTile(TILE_ID.ADMIN, x => {
-    ctx.fillStyle = '#8e5e3b'; ctx.fillRect(x, 0, W, W);
-    ctx.fillStyle = '#7a4e30';
-    for(let j=0; j<W/4; j++) {
-        ctx.fillRect(x, j*4, W, 1); // planks
+    ctx.fillStyle = '#9b6b42'; ctx.fillRect(x, 0, W, W);
+    // Plank rows
+    const plankH = 8;
+    const plankCols = ['#9b6b42','#8c5e38','#a8734a','#956342'];
+    for (let row = 0; row < Math.ceil(W / plankH); row++) {
+      ctx.fillStyle = plankCols[row % plankCols.length];
+      ctx.fillRect(x, row * plankH, W, plankH - 1);
+      // Plank seams (alternating offset)
+      const offset = row % 2 === 0 ? 0 : W / 2;
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      for (let seg = offset; seg < W + W / 2; seg += W / 2) {
+        if (seg < W) ctx.fillRect(x + seg, row * plankH, 1, plankH - 1);
+      }
     }
+    // Varnish sheen
+    ctx.fillStyle = 'rgba(255,200,100,0.08)';
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + W / 3, 0); ctx.lineTo(x, W / 3); ctx.closePath(); ctx.fill();
   });
 
-  // 6: WARD - soft purple/lavender
+  /** 6 — WARD: soft lavender with large diamond motif */
   drawTile(TILE_ID.WARD, x => {
-    checker(ctx, x, '#d8d0f0', '#cfc8e8', 16);
-    gridLines(ctx, x, '#a898c8', 0.15);
-    // Small diamond center
-    ctx.fillStyle = 'rgba(160,140,210,0.3)';
-    ctx.beginPath(); ctx.moveTo(x + 16, 4); ctx.lineTo(x + 28, 16);
-    ctx.lineTo(x + 16, 28); ctx.lineTo(x + 4, 16); ctx.closePath(); ctx.fill();
+    bigTileFloor(x, '#dcd0f2', '#d0c5ec', '#a898c8', 0.14);
+    ctx.fillStyle = 'rgba(150,130,220,0.12)';
+    ctx.beginPath();
+    ctx.moveTo(x + W / 2, 2); ctx.lineTo(x + W - 2, W / 2);
+    ctx.lineTo(x + W / 2, W - 2); ctx.lineTo(x + 2, W / 2);
+    ctx.closePath(); ctx.fill();
   });
 
-  // 7: BREAK/NUTRITION - break kitchen tile
+  /** 7 — BREAK/NUTRITION: white kitchen tiles */
   drawTile(TILE_ID.BREAK, x => {
-    ctx.fillStyle = '#dcdde1'; ctx.fillRect(x, 0, W, W);
-    checker(ctx, x, '#f5f6fa', '#dcdde1', W / 4);
-    gridLines(ctx, x, '#7f8fa6', 0.4);
-  });
-
-  // 8: NURSING - mint green
-  drawTile(TILE_ID.NURSING, x => {
-    ctx.fillStyle = '#9cecca'; ctx.fillRect(x, 0, W, W);
-    ctx.fillStyle = '#88e0b8';
-    for (let row = 0; row < 4; row++) {
-      ctx.fillRect(x, row * 8, W, 1);
+    bigTileFloor(x, '#f5f5f0', '#ececea', '#aaaaaa', 0.1);
+    // Subtle food accent dots
+    const accents = [[6,6],[22,6],[6,22],[22,22]];
+    for (const [ax, ay] of accents) {
+      ctx.fillStyle = 'rgba(200,160,80,0.15)';
+      ctx.beginPath(); ctx.arc(x + ax, ay, 2, 0, Math.PI * 2); ctx.fill();
     }
-    // H (hospital) motif
-    ctx.fillStyle = 'rgba(50,180,120,0.2)';
-    ctx.fillRect(x + 8, 8, 3, 16); ctx.fillRect(x + 21, 8, 3, 16);
-    ctx.fillRect(x + 8, 15, 16, 3);
-    gridLines(ctx, x, '#50a878', 0.1);
   });
 
-  // 9: RECEPTION - warm cream
+  /** 8 — NURSING: mint-green with H motif */
+  drawTile(TILE_ID.NURSING, x => {
+    bigTileFloor(x, '#9eecd0', '#8ee4c4', '#55b888', 0.2);
+    // Hospital H watermark
+    ctx.fillStyle = 'rgba(30,160,100,0.18)';
+    ctx.fillRect(x + 8, 8, 4, 16); ctx.fillRect(x + 20, 8, 4, 16);
+    ctx.fillRect(x + 8, 14, 16, 4);
+  });
+
+  /** 9 — RECEPTION: warm golden cream */
   drawTile(TILE_ID.RECEPTION, x => {
-    checker(ctx, x, '#fef0c0', '#f8e8a8', 16);
-    ctx.fillStyle = 'rgba(200,160,40,0.2)';
-    ctx.beginPath(); ctx.moveTo(x + 16, 0); ctx.lineTo(x + W, 16);
-    ctx.lineTo(x + 16, W); ctx.lineTo(x, 16); ctx.closePath(); ctx.fill();
-    gridLines(ctx, x, '#c0a840', 0.1);
+    bigTileFloor(x, '#fff0b8', '#f8e8a0', '#c0a030', 0.2);
+    // Welcome diamond
+    ctx.fillStyle = 'rgba(200,150,20,0.1)';
+    ctx.beginPath();
+    ctx.moveTo(x + W / 2, 2); ctx.lineTo(x + W - 2, W / 2);
+    ctx.lineTo(x + W / 2, W - 2); ctx.lineTo(x + 2, W / 2);
+    ctx.closePath(); ctx.fill();
   });
 
-  // 10: EMERGENCY - red alert
+  /** 10 — EMERGENCY: urgent red chevrons */
   drawTile(TILE_ID.EMERGENCY, x => {
     ctx.fillStyle = '#f8a8a8'; ctx.fillRect(x, 0, W, W);
-    ctx.fillStyle = '#f09090';
-    // Arrow pattern
-    ctx.globalAlpha = 0.25;
+    ctx.fillStyle = '#f09090'; ctx.fillRect(x, W / 2, W, W / 2);
+    // Alert chevrons
+    ctx.fillStyle = 'rgba(200,30,30,0.18)';
     for (let row = 0; row < 2; row++) {
-      ctx.fillStyle = '#e06060';
       ctx.beginPath();
-      ctx.moveTo(x + 4, row * 16 + 4); ctx.lineTo(x + 16, row * 16 + 10);
-      ctx.lineTo(x + 4, row * 16 + 16); ctx.closePath(); ctx.fill();
+      ctx.moveTo(x + 0, row * 16 + 4);
+      ctx.lineTo(x + 8, row * 16 + 10);
+      ctx.lineTo(x + 0, row * 16 + 16);
+      ctx.lineTo(x + 4, row * 16 + 16);
+      ctx.lineTo(x + 12, row * 16 + 10);
+      ctx.lineTo(x + 4, row * 16 + 4);
+      ctx.closePath(); ctx.fill();
       ctx.beginPath();
-      ctx.moveTo(x + 16, row * 16 + 4); ctx.lineTo(x + 28, row * 16 + 10);
-      ctx.lineTo(x + 16, row * 16 + 16); ctx.closePath(); ctx.fill();
+      ctx.moveTo(x + 12, row * 16 + 4);
+      ctx.lineTo(x + 20, row * 16 + 10);
+      ctx.lineTo(x + 12, row * 16 + 16);
+      ctx.lineTo(x + 16, row * 16 + 16);
+      ctx.lineTo(x + 24, row * 16 + 10);
+      ctx.lineTo(x + 16, row * 16 + 4);
+      ctx.closePath(); ctx.fill();
     }
+    // Grout
+    ctx.strokeStyle = '#d04040'; ctx.lineWidth = 0.5; ctx.globalAlpha = 0.3;
+    ctx.strokeRect(x + 0.5, 0.5, W - 1, W - 1);
+    ctx.beginPath(); ctx.moveTo(x + W/2, 0); ctx.lineTo(x + W/2, W); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, W/2); ctx.lineTo(x + W, W/2); ctx.stroke();
     ctx.globalAlpha = 1;
-    gridLines(ctx, x, '#d04040', 0.1);
   });
 
-  // 11: LAB - clean white/blue
+  /** 11 — LAB: clean blue-white */
   drawTile(TILE_ID.LAB, x => {
-    ctx.fillStyle = '#c8ddf8'; ctx.fillRect(x, 0, W, W);
-    checker(ctx, x, '#c0d8f8', '#b8d0f0', 8);
-    // Hex pattern
-    ctx.fillStyle = 'rgba(100,140,220,0.15)';
-    ctx.beginPath(); ctx.arc(x + 16, 16, 8, 0, Math.PI * 2); ctx.fill();
-    gridLines(ctx, x, '#8090c0', 0.12);
+    bigTileFloor(x, '#c8dcf8', '#bcd4f4', '#8090c0', 0.2);
+    // Hex/molecule motif
+    ctx.strokeStyle = 'rgba(80,120,220,0.15)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x + W/2, W/2, 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + W/2, W/2, 3, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(80,120,220,0.1)';
+    ctx.beginPath(); ctx.arc(x + W/2, W/2, 3, 0, Math.PI * 2); ctx.fill();
   });
 
-  // 12: RADIOLOGY - dark blue/indigo
+  /** 12 — RADIOLOGY: deep blue */
   drawTile(TILE_ID.RADIOLOGY, x => {
-    checker(ctx, x, '#b8c8f8', '#c0ccf8', 16);
-    ctx.fillStyle = 'rgba(80,80,220,0.12)';
-    ctx.fillRect(x + 6, 6, 20, 20);
-    gridLines(ctx, x, '#6070a0');
+    bigTileFloor(x, '#b8c8f8', '#aabcf0', '#6070a0', 0.22);
+    // X-ray cross-hairs
+    ctx.strokeStyle = 'rgba(60,80,200,0.12)'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(x + W/2, 0); ctx.lineTo(x + W/2, W); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, W/2); ctx.lineTo(x + W, W/2); ctx.stroke();
   });
 
-  // 13: CME - clean white/grey
+  /** 13 — CME: sterile grey-white */
   drawTile(TILE_ID.CME, x => {
-    ctx.fillStyle = '#e4e8f0'; ctx.fillRect(x, 0, W, W);
-    checker(ctx, x, '#e0e4ec', '#d8dce8', 8);
-    ctx.fillStyle = 'rgba(100,110,140,0.1)';
-    // Autoclave symbol (circle)
-    ctx.beginPath(); ctx.arc(x + 16, 16, 8, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(100,120,160,0.2)'; ctx.lineWidth = 2; ctx.stroke();
+    bigTileFloor(x, '#e8ecf4', '#dde2ee', '#9098b0', 0.15);
+    // Sterilization concentric circles
+    ctx.strokeStyle = 'rgba(80,100,150,0.12)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x + W/2, W/2, 9, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(x + W/2, W/2, 5, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = 'rgba(80,100,150,0.08)';
+    ctx.beginPath(); ctx.arc(x + W/2, W/2, 5, 0, Math.PI * 2); ctx.fill();
   });
 
-  // 14: MATERNITY - soft pink
+  /** 14 — MATERNITY: soft rosy pink */
   drawTile(TILE_ID.MATERNITY, x => {
-    ctx.fillStyle = '#f8c8d4'; ctx.fillRect(x, 0, W, W);
-    ctx.fillStyle = '#f0b8c4';
-    for (let row = 0; row < 4; row++) ctx.fillRect(x, row * 8, W, 1);
-    // Heart motif
-    ctx.fillStyle = 'rgba(220,80,120,0.15)';
-    ctx.beginPath();
-    ctx.arc(x + 12, 14, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath();
-    ctx.arc(x + 20, 14, 5, 0, Math.PI * 2); ctx.fill();
-    ctx.fillRect(x + 8, 16, 16, 10);
+    bigTileFloor(x, '#fcc8d4', '#f8bcc8', '#c87898', 0.15);
+    // Heart watermark
+    ctx.fillStyle = 'rgba(220,80,120,0.12)';
+    const hx = x + W/2, hy = W/2;
+    ctx.beginPath(); ctx.arc(hx - 4, hy - 2, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(hx + 4, hy - 2, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(hx - 8, hy); ctx.lineTo(hx, hy + 8); ctx.lineTo(hx + 8, hy); ctx.closePath(); ctx.fill();
   });
 
-  // 15: ONCOLOGY - mint/teal green
+  /** 15 — ONCOLOGY: teal mint */
   drawTile(TILE_ID.ONCOLOGY, x => {
-    ctx.fillStyle = '#a8e8d0'; ctx.fillRect(x, 0, W, W);
-    checker(ctx, x, '#a0e0c8', '#98d8c0', 16);
-    ctx.fillStyle = 'rgba(50,150,120,0.15)';
-    ctx.beginPath(); ctx.arc(x + 16, 16, 10, 0, Math.PI * 2); ctx.fill();
-    gridLines(ctx, x, '#40a878', 0.1);
+    bigTileFloor(x, '#a8ecd4', '#9ce4c8', '#44a878', 0.18);
+    // Ribbon motif
+    ctx.strokeStyle = 'rgba(30,140,100,0.18)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(x + W/2, W/2, 8, 0, Math.PI * 2); ctx.stroke();
   });
 
-  // 16: REHAB - warm yellow/orange
+  /** 16 — REHAB: warm yellow */
   drawTile(TILE_ID.REHAB, x => {
-    ctx.fillStyle = '#fef0b0'; ctx.fillRect(x, 0, W, W);
-    ctx.fillStyle = '#f8e090';
-    for (let row = 0; row < 4; row++) ctx.fillRect(x, row * 8, W, 1);
-    // Running figure (simplified)
-    ctx.fillStyle = 'rgba(180,140,20,0.12)';
-    ctx.fillRect(x + 10, 6, 12, 20);
-    gridLines(ctx, x, '#c0a020', 0.1);
+    bigTileFloor(x, '#fef0a8', '#f8e490', '#c0a020', 0.15);
+    // Dumbbell / motion lines
+    ctx.fillStyle = 'rgba(170,130,10,0.12)';
+    ctx.fillRect(x + 8, W/2 - 2, 16, 4);
+    ctx.beginPath(); ctx.arc(x + 8, W/2, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(x + 24, W/2, 4, 0, Math.PI * 2); ctx.fill();
   });
 
-  // 17: OUTPATIENT - light blue
+  /** 17 — OUTPATIENT: sky blue */
   drawTile(TILE_ID.OUTPATIENT, x => {
-    ctx.fillStyle = '#c8e8f8'; ctx.fillRect(x, 0, W, W);
-    checker(ctx, x, '#c0e0f0', '#b8d8e8', 16);
-    gridLines(ctx, x, '#6090b0', 0.12);
+    bigTileFloor(x, '#c8e8f8', '#bce0f4', '#6090b0', 0.18);
   });
 
-  // 18: PSYCH - soft lavender
+  /** 18 — PSYCH: soothing lavender */
   drawTile(TILE_ID.PSYCH, x => {
-    ctx.fillStyle = '#e4d0f8'; ctx.fillRect(x, 0, W, W);
-    ctx.fillStyle = '#d8c0f0';
-    for (let row = 0; row < 4; row++) ctx.fillRect(x, row * 8, W, 1);
-    ctx.fillStyle = 'rgba(140,80,200,0.1)';
-    ctx.beginPath(); ctx.arc(x + 16, 16, 8, 0, Math.PI * 2); ctx.fill();
+    bigTileFloor(x, '#e4ccf8', '#dcc0f4', '#9060c0', 0.12);
+    // Calming spiral
+    ctx.strokeStyle = 'rgba(130,60,200,0.1)'; ctx.lineWidth = 1.2;
+    for (let r = 10; r >= 2; r -= 3) {
+      ctx.beginPath(); ctx.arc(x + W/2, W/2, r, 0, Math.PI * 1.8); ctx.stroke();
+    }
   });
 
   ct.refresh();
@@ -425,6 +446,8 @@ export interface NPCDef {
   hairColor: number;
   skinColor?: number;
   dialogues: DialogueDef[];
+  /** Optional rotating dialogue pools — each pool is shown in sequence across conversations */
+  dialoguePools?: DialogueDef[][];
   missionIds: string[];
   schedule: { hour: number; col: number; row: number }[];
 }
@@ -442,6 +465,10 @@ export interface DialogueChoice {
   missionEffect?: string;
   next?: string;
   tooltip?: string;
+  /** When true, the choice represents the best nursing management decision */
+  correct?: boolean;
+  /** Feedback shown when the student makes this choice */
+  feedback?: string;
 }
 
 export interface GameState {
@@ -871,6 +898,53 @@ export const NPC_DEFS: NPCDef[] = [
         choices: [{ text: 'Fico feliz em ouvir isso, Ana!' }],
       },
     ],
+    dialoguePools: [
+      // Pool 1: Classificação de Risco de Manchester (Kurcgant cap.6)
+      [{
+        id: 'pool1',
+        text: [
+          'Precisamos de uma decisão rápida aqui na triagem!',
+          'Paciente chegou com dor torácica há 30 minutos, sudorese fria, PA 90x60.',
+          'Qual é a classificação correta pelo Protocolo de Manchester?',
+        ],
+        choices: [
+          { text: 'Vermelho — emergência, atendimento imediato sem espera.', correct: true, tooltip: 'Dor torácica + instabilidade hemodinâmica = código vermelho (MTS)', feedback: 'Correto! Sinais de choque + dor torácica = categoria vermelha no Manchester. Risco de IAM iminente. (Manchester Triage Group, 2014)', effect: (s) => ({ prestige: s.prestige + 25 }) },
+          { text: 'Laranja — muito urgente, atendimento em até 10 minutos.', correct: false, tooltip: 'Atenção à instabilidade hemodinâmica presente', feedback: 'Quase! A instabilidade hemodinâmica (PA 90x60 + sudorese) eleva para vermelho, não laranja. (MTS, 2014)', effect: (s) => ({ prestige: s.prestige + 8 }) },
+          { text: 'Amarelo — urgente, atendimento em até 60 minutos.', correct: false, tooltip: 'Esse quadro não pode aguardar 60 minutos', feedback: 'Incorreto. Dor torácica com choque não pode esperar. O tempo é miocárdio! (ACLS 2020)', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'Verde — pouco urgente, aguarda na fila padrão.', correct: false, tooltip: 'Triagem inadequada pode custar a vida do paciente', feedback: 'Perigoso! Subtriar esse quadro pode ser fatal. Revise o Protocolo de Manchester. (Kurcgant, 2016)', effect: (s) => ({ prestige: s.prestige - 5 }) },
+        ],
+      }],
+      // Pool 2: Acolhimento com Classificação de Risco — PNH (cap.6)
+      [{
+        id: 'pool2',
+        text: [
+          'Chegou uma senhora idosa sozinha, confusa, sem cartão do SUS.',
+          'A fila está grande e a equipe está sobrecarregada.',
+          'Qual deve ser o primeiro passo segundo a Política Nacional de Humanização?',
+        ],
+        choices: [
+          { text: 'Realizar o acolhimento com escuta qualificada e classificação de risco imediatamente.', correct: true, tooltip: 'PNH: acolhimento independente da situação documental', feedback: 'Correto! O acolhimento com classificação de risco é a porta de entrada da PNH. Nenhum paciente pode ser recusado. (MS, HumanizaSUS 2009)', effect: (s) => ({ prestige: s.prestige + 25 }) },
+          { text: 'Solicitar documento de identidade antes de prosseguir com o atendimento.', correct: false, feedback: 'Incorreto. A ausência de documentos nunca justifica a recusa de atendimento (Art. 196, CF/88).', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'Encaminhar para serviço social e aguardar resolução do cadastro.', correct: false, feedback: 'Incompleto. Primeiro classifique o risco — só depois o serviço social pode agir.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Chamar familiar por telefone e aguardar responsável antes de atender.', correct: false, feedback: 'Incorreto. Paciente confuso pode estar em risco. Avalie primeiro, busque familiar depois.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+        ],
+      }],
+      // Pool 3: Fluxo de Atendimento — gestão de filas (Kurcgant cap.4)
+      [{
+        id: 'pool3',
+        text: [
+          'O tempo médio de espera na recepção subiu para 4 horas.',
+          'Pacientes estão saindo sem ser atendidos — evasão hospitalar.',
+          'Qual intervenção de gestão é mais eficaz para reduzir o tempo de espera?',
+        ],
+        choices: [
+          { text: 'Mapear o fluxo atual (fluxograma), identificar gargalos e redistribuir recursos nos pontos críticos.', correct: true, tooltip: 'Análise de processos: ferramenta de gestão de fluxo (Kurcgant cap.4)', feedback: 'Excelente! O mapeamento de fluxo e análise de gargalos é a base da gestão científica de processos hospitalares. (Kurcgant, 2016 cap.4)', effect: (s) => ({ prestige: s.prestige + 28 }) },
+          { text: 'Contratar mais recepcionistas para atender mais rápido.', correct: false, feedback: 'Apenas aumentar pessoal sem mapear o processo raramente resolve o problema e aumenta custos.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Colocar aviso na entrada pedindo que pacientes não urgentes busquem UBS.', correct: false, feedback: 'Medida paliativa. Sem triagem adequada, pode negar atendimento a pacientes que precisam.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Reduzir o horário de atendimento para concentrar a equipe.', correct: false, feedback: 'Reduzir horário aumenta a concentração de demanda nos picos, piorando o problema.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+        ],
+      }],
+    ],
   },
   {
     id: 'enf_carlos',
@@ -934,6 +1008,50 @@ export const NPC_DEFS: NPCDef[] = [
         ],
         choices: [{ text: 'Continue o ótimo trabalho, Carlos!' }],
       },
+    ],
+    dialoguePools: [
+      [{
+        id: 'pool1_carlos',
+        text: [
+          'Temos um paciente com suspeita de sepse — PA 80x50, febre 39°C, lactato 3,2.',
+          'O residente pediu para aguardar mais exames antes de iniciar antibiótico.',
+          'Como gerente, qual é a conduta correta baseada na Bundle de Sepse?',
+        ],
+        choices: [
+          { text: 'Iniciar antibiótico em até 1 hora, coletar hemoculturas, repor volemia conforme bundle de 1h.', correct: true, tooltip: 'Bundle de sepse: antibiótico na 1ª hora reduz mortalidade em 7% por hora de atraso', feedback: 'Perfeito! A Bundle de 1h da Surviving Sepsis Campaign (2018) é mandatória: antibiótico < 1h, hemocultura, lactato e reposição volêmica.', effect: (s) => ({ prestige: s.prestige + 30, stress: s.stress + 5 }) },
+          { text: 'Aguardar resultado de hemograma e PCR para confirmar sepse antes de antibiótico.', correct: false, feedback: 'Incorreto. Em sepse, cada hora de atraso do antibiótico aumenta a mortalidade em ~7%. Não aguarde exames.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Solicitar parecer da infectologia antes de iniciar qualquer tratamento.', correct: false, feedback: 'Perigoso! O parecer pode demorar horas. A bundle de sepse não pode aguardar. Trate empiricamente.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'Transferir para UTI e aguardar o intensivista decidir o tratamento.', correct: false, feedback: 'Incompleto. A bundle deve ser iniciada no PS imediatamente, não pode aguardar a UTI.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_carlos',
+        text: [
+          'A equipe está com 3 técnicos de enfermagem para atender 18 pacientes no PS.',
+          'Segundo o COFEN, qual é o dimensionamento mínimo para o Pronto-Socorro?',
+          'Preciso da sua orientação para justificar mais contratações à direção.',
+        ],
+        choices: [
+          { text: 'Resolução COFEN 543/2017: no mínimo 1 enfermeiro para cada 10 pacientes em unidade de urgência.', correct: true, tooltip: 'Resolução COFEN 543/2017 — parâmetros de dimensionamento', feedback: 'Correto! A Resolução COFEN 543/2017 estabelece parâmetros mínimos. No PS de média/alta complexidade: 1 enf./10 pacientes. Use isso para fundamentar a solicitação. (Kurcgant, 2016 cap.10)', effect: (s) => ({ prestige: s.prestige + 28 }) },
+          { text: 'Não há regulamentação específica; cada hospital define seus próprios parâmetros.', correct: false, feedback: 'Incorreto. A Resolução COFEN 543/2017 define parâmetros mínimos para dimensionamento em todos os setores.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'O importante é ter pelo menos 1 enfermeiro de plantão, independente do número de pacientes.', correct: false, feedback: 'Insuficiente. A legislação estabelece relação quantitativa enfermeiro/paciente específica por setor e complexidade.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'O dimensionamento é calculado pela direção hospitalar com base no orçamento disponível.', correct: false, feedback: 'Errado. O COFEN define parâmetros técnicos mínimos que devem ser respeitados independente do orçamento.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_carlos',
+        text: [
+          'Acabei de discutir com a médica plantonista sobre a conduta de um paciente.',
+          'Ela ignorou minha observação sobre o risco de broncoaspiração.',
+          'Como o enfermeiro gerente deve lidar com conflitos multiprofissionais?',
+        ],
+        choices: [
+          { text: 'Comunicar a observação por escrito no prontuário e, se necessário, escalar ao chefe médico com dados clínicos.', correct: true, tooltip: 'Comunicação estruturada e documentada: SBAR/I-PASS', feedback: 'Correto! A comunicação efetiva via SBAR (Situação-Background-Avaliação-Recomendação) e registro no prontuário protegem o paciente e o profissional. (Kurcgant cap.5 — Conflitos)', effect: (s) => ({ prestige: s.prestige + 25 }) },
+          { text: 'Aceitar a decisão médica e não interferir — a responsabilidade é dela.', correct: false, feedback: 'Incorreto. O enfermeiro tem responsabilidade autônoma pela segurança do paciente. Omitir-se é negligência.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Relatar imediatamente ao COREN como desentendimento multiprofissional.', correct: false, feedback: 'Precipitado. O COREN é para questões éticas graves. Primeiro tente a comunicação direta estruturada.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'Falar com outros colegas sobre o comportamento da médica para obter apoio.', correct: false, feedback: 'Incorreto. Fofoca profissional piora o clima e viola princípios éticos. Comunique-se diretamente.', effect: (s) => ({ prestige: s.prestige - 3 }) },
+        ],
+      }],
     ],
   },
   {
@@ -999,6 +1117,50 @@ export const NPC_DEFS: NPCDef[] = [
         choices: [{ text: 'Ótimo trabalho, João!' }],
       },
     ],
+    dialoguePools: [
+      [{
+        id: 'pool1_joao',
+        text: [
+          'Precisamos revisar o estoque de medicamentos da UTI.',
+          'Temos itens A, B e C com perfis de custo e giro muito diferentes.',
+          'Qual metodologia de gestão de estoque é mais indicada? (Kurcgant cap.12)',
+        ],
+        choices: [
+          { text: 'Curva ABC: itens A = 80% do custo (controle rigoroso), B = 15%, C = 5% (controle menor).', correct: true, tooltip: 'Curva ABC — ferramenta padrão de gestão de materiais hospitalares', feedback: 'Excelente! A Curva ABC é a principal ferramenta de gestão de estoque em saúde. Itens A exigem controle diário, B semanal, C mensal. (Kurcgant, 2016 cap.12)', effect: (s) => ({ prestige: s.prestige + 28 }) },
+          { text: 'Comprar em grande quantidade para garantir estoque de 6 meses e evitar falta.', correct: false, feedback: 'Incorreto. Estoques excessivos geram custos de armazenamento, vencimento e capital imobilizado. (Kurcgant cap.12)', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Priorizar os medicamentos mais utilizados pelos médicos, independente do custo.', correct: false, feedback: 'Incompleto. O uso sem análise de custo-efetividade não é gestão racional de recursos. (Kurcgant cap.14)', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Terceirizar todo o estoque para uma empresa de logística hospitalar.', correct: false, feedback: 'Pode ser uma solução, mas não substitui o conhecimento do método ABC para controle e rastreabilidade.', effect: (s) => ({ prestige: s.prestige + 1 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_joao',
+        text: [
+          'Um paciente chegou da enfermaria usando 12 medicamentos crônicos diferentes.',
+          'Na admissão, o prescritor só registrou 7 no sistema hospitalar.',
+          'O que o protocolo de Reconciliação Medicamentosa determina fazer?',
+        ],
+        choices: [
+          { text: 'Obter a lista completa de medicamentos do paciente (anamnese farmacológica) e reconciliar com a prescrição hospitalar.', correct: true, tooltip: 'OMS — 5ª Meta Internacional: reconciliação medicamentosa', feedback: 'Correto! A Reconciliação Medicamentosa é a 3ª Meta da OMS para Segurança do Paciente. Previne até 70% dos erros na transição do cuidado. (Kurcgant cap.6)', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'Suspender todos os medicamentos crônicos durante a internação para evitar interações.', correct: false, feedback: 'Perigoso! Suspensão abrupta pode causar síndrome de abstinência, descompensação de doenças crônicas.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Manter apenas os 7 medicamentos registrados e documentar que o paciente não soube informar os demais.', correct: false, feedback: 'Incorreto. O farmacêutico deve investigar ativamente a lista completa em múltiplas fontes.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'Encaminhar para o médico decidir quais medicamentos manter sem levantamento ativo.', correct: false, feedback: 'Incompleto. A reconciliação ativa é responsabilidade multiprofissional — farmácia e enfermagem atuam juntos.', effect: (s) => ({ prestige: s.prestige + 4 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_joao',
+        text: [
+          'A equipe de enfermagem quer guardar medicamentos vasoativos na gaveta da enfermaria.',
+          'Qual é a regulamentação sobre armazenamento de medicamentos de alta vigilância?',
+          '(Kurcgant cap.12 — Gestão de Recursos Materiais)',
+        ],
+        choices: [
+          { text: 'Medicamentos de alta vigilância devem ficar em área controlada, com dupla checagem de acesso e identificação especial — não em gaveta aberta.', correct: true, tooltip: 'ANVISA/ISMP — medicamentos de alta vigilância exigem barreiras de segurança', feedback: 'Perfeito! O ISMP Brasil e a ANVISA exigem que medicamentos de alta vigilância (vasoativos, eletrólitos concentrados, insulina) tenham controle especial de acesso e identificação diferenciada. (Kurcgant cap.12)', effect: (s) => ({ prestige: s.prestige + 28 }) },
+          { text: 'Não há restrição específica; basta manter o frasco com rótulo correto.', correct: false, feedback: 'Incorreto. Medicamentos de alta vigilância têm regulamentação específica do ISMP para prevenção de erros graves.', effect: (s) => ({ prestige: s.prestige - 3 }) },
+          { text: 'Podem ficar na gaveta desde que a chave esteja com o enfermeiro responsável.', correct: false, feedback: 'Insuficiente. A chave com o enfermeiro não basta — são necessárias barreiras de dupla checagem e identificação visual especial.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Guardar em geladeira separada é suficiente para qualquer medicamento de risco.', correct: false, feedback: 'Incompleto. Refrigeração é necessária para alguns, mas não substitui os protocolos de alta vigilância do ISMP.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+        ],
+      }],
+    ],
   },
   {
     id: 'tec_laboratorio',
@@ -1058,6 +1220,50 @@ export const NPC_DEFS: NPCDef[] = [
         choices: [{ text: 'Continue esse excelente trabalho!' }],
       },
     ],
+    dialoguePools: [
+      [{
+        id: 'pool1_renata',
+        text: [
+          'Chegou um resultado de potássio = 6,8 mEq/L de um paciente da UTI.',
+          'O enfermeiro de plantão não foi avisado ainda — já passaram 45 minutos.',
+          'O que o protocolo de valores críticos determina nesta situação?',
+        ],
+        choices: [
+          { text: 'Comunicação imediata (< 30 min) ao enfermeiro/médico responsável, com registro documentado do horário e nome de quem recebeu.', correct: true, tooltip: 'JCI/ONA: comunicação de valores críticos em até 30 minutos', feedback: 'Correto! Potássio 6,8 é criticamente alto (risco de PCR). A JCI e ONA exigem comunicação ativa em < 30 min com documentação completa. (Kurcgant cap.6)', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'Registrar no sistema e aguardar o enfermeiro verificar no próximo acesso.', correct: false, feedback: 'Perigoso! Potássio 6,8 pode causar arritmia fatal em minutos. O contato ativo e imediato é mandatório.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Ligar para o setor e deixar recado com qualquer funcionário disponível.', correct: false, feedback: 'Insuficiente. O protocolo exige confirmação de recebimento por profissional habilitado, não apenas "recado deixado".', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Enviar e-mail para o plantonista com o resultado e aguardar retorno.', correct: false, feedback: 'E-mail não garante comunicação imediata. Valores críticos exigem contato direto por telefone/pessoalmente.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_renata',
+        text: [
+          'Três tubos chegaram sem etiqueta de identificação do paciente.',
+          'A coleta foi feita pelo técnico de plantão na enfermaria.',
+          'Qual é a conduta correta segundo as metas de segurança do paciente?',
+        ],
+        choices: [
+          { text: 'Descartar os tubos e notificar a equipe para nova coleta com identificação adequada — nunca processar amostra sem identificação.', correct: true, tooltip: 'OMS 1ª Meta: identificação correta do paciente', feedback: 'Correto! A 1ª Meta da OMS para Segurança do Paciente é a identificação correta. Amostras sem ID nunca devem ser processadas — risco de trocar resultados entre pacientes. (Kurcgant cap.6)', effect: (s) => ({ prestige: s.prestige + 28 }) },
+          { text: 'Processar os tubos e tentar identificar depois pelo registro da coleta.', correct: false, feedback: 'Perigoso! Processar amostra sem identificação pode gerar troca de resultados com consequências graves para o paciente.', effect: (s) => ({ prestige: s.prestige - 8 }) },
+          { text: 'Telefonar para o setor e perguntar qual paciente foi coletado naquele horário.', correct: false, feedback: 'Insuficiente. A confirmação verbal não garante segurança. O protocolo exige identificação no ponto de coleta.', effect: (s) => ({ prestige: s.prestige + 4 }) },
+          { text: 'Processar e colocar como "identificação pendente" no sistema até esclarecer.', correct: false, feedback: 'Incorreto. Resultados "pendentes" sem ID podem ser consultados erroneamente por outro paciente.', effect: (s) => ({ prestige: s.prestige + 1 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_renata',
+        text: [
+          'O laboratório quer implantar um sistema informatizado de gestão de amostras.',
+          'A diretora perguntou quais critérios deve considerar na escolha do sistema.',
+          'Com base em Sistemas de Informação em Saúde (Kurcgant cap.7), o que é prioritário?',
+        ],
+        choices: [
+          { text: 'Interoperabilidade com o prontuário eletrônico (integração PEP-LIS), rastreabilidade de amostras e tempo de resposta para valores críticos.', correct: true, tooltip: 'Kurcgant cap.7 — Sistemas de Informação: integração e rastreabilidade como critérios-chave', feedback: 'Excelente! A integração PEP-LIS, rastreabilidade e alertas de valores críticos são os critérios fundamentais para segurança do paciente em SIS. (Kurcgant cap.7)', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'O sistema mais barato que atenda às necessidades básicas de registro.', correct: false, feedback: 'Custo é critério, mas não pode ser o único. Sistemas inadequados geram erros que custam mais que o economizado.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'O sistema mais utilizado no mercado, independente da integração com os outros sistemas.', correct: false, feedback: 'Popularidade sem integração cria ilhas de informação. A interoperabilidade é critério essencial. (Kurcgant cap.7)', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Qualquer sistema cloud é suficiente; o importante é a interface ser fácil de usar.', correct: false, feedback: 'Usabilidade é importante, mas segurança de dados, integração e conformidade com LGPD são igualmente críticos.', effect: (s) => ({ prestige: s.prestige + 1 }) },
+        ],
+      }],
+    ],
   },
   {
     id: 'dr_radiologista',
@@ -1099,6 +1305,50 @@ export const NPC_DEFS: NPCDef[] = [
         ],
         choices: [{ text: 'Ótima parceria, doutor!' }],
       },
+    ],
+    dialoguePools: [
+      [{
+        id: 'pool1_farias',
+        text: [
+          'A fila de laudos de TC está com 6 horas de atraso.',
+          'Um paciente com suspeita de AVC está aguardando resultado há 2 horas.',
+          'Qual deve ser a prioridade segundo gestão de fluxo diagnóstico?',
+        ],
+        choices: [
+          { text: 'Priorizar o paciente com suspeita de AVC imediatamente — janela terapêutica de 4,5 horas é crítica.', correct: true, tooltip: 'AVC: janela terapêutica de 4,5h para trombólise (SBN)', feedback: 'Correto! Em AVC isquêmico a janela é de 4,5h para trombólise. A priorização por criticidade clínica deve sobrepor a ordem de chegada. (Kurcgant cap.4)', effect: (s) => ({ prestige: s.prestige + 28 }) },
+          { text: 'Seguir a ordem de chegada — qualquer exceção gera reclamação dos outros pacientes.', correct: false, feedback: 'Incorreto. A priorização clínica é eticamente mandatória. Prioridade nunca é simplesmente pela ordem de chegada.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Contatar o médico solicitante e pedir que aguarde mais 2 horas para a fila normalizar.', correct: false, feedback: 'Perigoso! Em 2 horas a janela terapêutica do AVC pode ter encerrado. Priorize imediatamente.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'Transferir o paciente para outro hospital com tomógrafo disponível.', correct: false, feedback: 'Desnecessário se o tomógrafo está disponível. Priorize o laudo urgente e realize o exame já.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_farias',
+        text: [
+          'Um técnico pediu para usar o TC sem EPIs adequados para "economizar tempo".',
+          'Qual é a conduta correta do gerente de enfermagem sobre Gestão de Recursos Físicos?',
+          '(Kurcgant cap.13 — Gestão de Recursos Físicos e Ambientais)',
+        ],
+        choices: [
+          { text: 'Interromper o procedimento, garantir uso de EPIs e registrar a situação como potencial evento adverso.', correct: true, tooltip: 'CNEN/ANVISA: proteção radiológica é obrigatória', feedback: 'Correto! A proteção radiológica é regulamentada pela CNEN. O gerente deve garantir compliance com normas de segurança independente de "ganhar tempo". (Kurcgant cap.13)', effect: (s) => ({ prestige: s.prestige + 28 }) },
+          { text: 'Permitir uma vez, mas registrar como advertência informal ao técnico.', correct: false, feedback: 'Incorreto. Exposição à radiação sem EPI é irreversível. Não há "uma vez" aceitável para este tipo de risco.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Solicitar ao técnico que treine outros colegas sobre uso correto de EPIs.', correct: false, feedback: 'Treinamento é correto mas insuficiente agora. Primeiro interrompa a situação de risco.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Consultar o manual do equipamento para confirmar se EPI é realmente necessário.', correct: false, feedback: 'Desnecessário. A norma CNEN é clara: EPIs são obrigatórios em área de radiação ionizante.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_farias',
+        text: [
+          'O equipamento de ressonância está quebrado há 15 dias aguardando manutenção.',
+          'Qual é a responsabilidade do enfermeiro gerente nessa situação?',
+          '(Kurcgant cap.13 — Gestão de Recursos Físicos)',
+        ],
+        choices: [
+          { text: 'Registrar o problema formalmente, notificar a direção, mapear o impacto assistencial e acompanhar o prazo de manutenção.', correct: true, tooltip: 'Gestão de recursos físicos: papel do enfermeiro gerente (Kurcgant cap.13)', feedback: 'Correto! O enfermeiro gerente é responsável por notificar, documentar e acompanhar a resolução de falhas em recursos físicos que impactam a assistência. (Kurcgant cap.13)', effect: (s) => ({ prestige: s.prestige + 25 }) },
+          { text: 'Aguardar que a engenharia hospitalar resolva sozinha sem intervenção da enfermagem.', correct: false, feedback: 'Incorreto. A enfermagem gerencial deve acompanhar ativamente a resolução de falhas de equipamentos que impactam pacientes.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'Comunicar verbalmente ao chefe e continuar sem registro formal.', correct: false, feedback: 'Insuficiente. O registro formal é necessário para rastreabilidade, auditoria e responsabilidade legal.', effect: (s) => ({ prestige: s.prestige + 4 }) },
+          { text: 'Comprar um novo equipamento sem passar pela direção para agilizar.', correct: false, feedback: 'Incorreto. Compras hospitalares têm fluxo de autorização específico. A aquisição independente pode configurar irregularidade.', effect: (s) => ({ prestige: s.prestige - 3 }) },
+        ],
+      }],
     ],
   },
   {
@@ -1182,6 +1432,50 @@ export const NPC_DEFS: NPCDef[] = [
         choices: [{ text: 'Obrigada, diretora!' }],
       },
     ],
+    dialoguePools: [
+      [{
+        id: 'pool1_diretora',
+        text: [
+          'Precisamos escolher a abordagem para o planejamento estratégico do HUAP.',
+          'Temos três horizontes possíveis: operacional (1 ano), tático (2-3 anos), estratégico (5 anos).',
+          'Como enfermeira gerente, qual deve ser o foco prioritário agora? (Kurcgant cap.4)',
+        ],
+        choices: [
+          { text: 'Planejamento integrado nos três horizontes, com ações imediatas alinhadas ao plano estratégico de longo prazo.', correct: true, tooltip: 'Kurcgant cap.4: planejamento em múltiplos horizontes temporais integrados', feedback: 'Excelente! O planejamento eficaz articula os três horizontes. Ações operacionais devem ser coerentes com o plano estratégico. (Kurcgant, 2016 cap.4)', effect: (s) => ({ prestige: s.prestige + 35 }) },
+          { text: 'Focar apenas no plano operacional — problemas diários são mais urgentes que metas de 5 anos.', correct: false, feedback: 'Visão de curto prazo isolada gera "apagão de incêndios" permanente. Sem estratégia, ações perdem coerência. (Kurcgant cap.4)', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Aguardar o planejamento da diretoria antes de tomar qualquer decisão.', correct: false, feedback: 'Passividade gerencial. O enfermeiro gerente participa ativamente do planejamento, não apenas executa. (Kurcgant cap.4)', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'Contratar consultoria externa para elaborar o plano estratégico completo.', correct: false, feedback: 'Consultoria pode apoiar, mas o planejamento deve ser participativo — construído com a equipe interna. (Kurcgant cap.4)', effect: (s) => ({ prestige: s.prestige + 3 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_diretora',
+        text: [
+          'A cultura organizacional do HUAP mostra resistência a mudanças.',
+          'Como gerente você quer implementar novos protocolos, mas a equipe resiste.',
+          'Qual abordagem de gestão da mudança é mais eficaz? (Kurcgant cap.1)',
+        ],
+        choices: [
+          { text: 'Envolver a equipe no diagnóstico e construção da mudança, legitimando o processo com os próprios trabalhadores.', correct: true, tooltip: 'Kurcgant cap.1: cultura organizacional e gestão participativa da mudança', feedback: 'Perfeito! Mudanças sustentáveis são construídas com participação da equipe. A resistência é menor quando os trabalhadores se sentem coautores. (Kurcgant cap.1)', effect: (s) => ({ prestige: s.prestige + 35 }) },
+          { text: 'Implementar as mudanças de forma mandatória com apoio da diretoria.', correct: false, feedback: 'Implementação autoritária gera resistência passiva e boicote velado. A adesão precisa ser conquistada. (Kurcgant cap.1)', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Aguardar que a equipe amadureça e aceite as mudanças naturalmente.', correct: false, feedback: 'Passividade. Mudanças positivas exigem liderança ativa — não acontecem espontaneamente. (Kurcgant cap.1)', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'Substituir os profissionais que resistem à mudança por outros mais receptivos.', correct: false, feedback: 'Extremo e contraproducente. Substituição sem gestão do processo perpetua a cultura resistente. (Kurcgant cap.1)', effect: (s) => ({ prestige: s.prestige - 5 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_diretora',
+        text: [
+          'Os custos operacionais do hospital subiram 22% este trimestre.',
+          'A diretoria pede corte de 15% nos gastos de enfermagem.',
+          'Como gerente, como você aborda o corte sem comprometer a assistência? (Kurcgant cap.14)',
+        ],
+        choices: [
+          { text: 'Mapear custos fixos e variáveis, identificar desperdícios com custo-benefício, propor cortes nos processos — nunca no dimensionamento mínimo de pessoal.', correct: true, tooltip: 'Kurcgant cap.14: gestão de custos em enfermagem — análise antes do corte', feedback: 'Excelente! A análise de custos (Kurcgant cap.14) exige identificação de desperdícios e não pode comprometer o dimensionamento mínimo seguro de pessoal (COFEN 543/2017).', effect: (s) => ({ prestige: s.prestige + 38 }) },
+          { text: 'Cortar horas extras e contratos temporários imediatamente para atingir a meta de 15%.', correct: false, feedback: 'Cortar pessoal sem análise pode aumentar eventos adversos e no longo prazo custar mais com complicações.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Recusar o corte alegando que qualquer redução é perigosa para os pacientes.', correct: false, feedback: 'Recusar sem análise é irresponsável. O gerente deve apresentar alternativas fundamentadas, não apenas recusar.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Reduzir insumos e materiais de proteção para cumprir a meta rapidamente.', correct: false, feedback: 'Reduzir EPIs e materiais de proteção aumenta infecções e eventos adversos, gerando custo muito maior. (ANVISA)', effect: (s) => ({ prestige: s.prestige - 8 }) },
+        ],
+      }],
+    ],
   },
   {
     id: 'tec_rosa_cme',
@@ -1225,6 +1519,50 @@ export const NPC_DEFS: NPCDef[] = [
         choices: [{ text: 'Trabalho essencial, Rosa!' }],
       },
     ],
+    dialoguePools: [
+      [{
+        id: 'pool1_rosa',
+        text: [
+          'Encontramos uma caixa de pinças cirúrgicas com embalagem violada no armário.',
+          'A cirurgia está marcada daqui a 1 hora e o material já foi separado.',
+          'O que determina a RDC 15/2012 da ANVISA nesta situação?',
+        ],
+        choices: [
+          { text: 'Devolver o material para reprocessamento imediato — embalagem violada = material não estéril, independente do prazo da cirurgia.', correct: true, tooltip: 'RDC 15/2012: integridade da embalagem = garantia de esterilidade', feedback: 'Correto! A RDC 15/2012 é clara: a integridade da embalagem é garantia de esterilidade. Material com embalagem violada deve ser reprocessado sem exceção. (Kurcgant cap.12)', effect: (s) => ({ prestige: s.prestige + 32 }) },
+          { text: 'Usar o material nessa cirurgia e reforçar a vigilância pós-operatória para infecção.', correct: false, feedback: 'Perigoso! Usar material de esterilidade incerta é risco grave de infecção cirúrgica. A RDC 15/2012 não permite exceções.', effect: (s) => ({ prestige: s.prestige - 10 }) },
+          { text: 'Limpar a embalagem com álcool 70% e avaliar visualmente se o material parece íntegro.', correct: false, feedback: 'Incorreto. Álcool na embalagem não reestabelece esterilidade. A RDC é clara: embalagem violada = reprocessamento.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Adiar a cirurgia por 24 horas para aguardar novo material.', correct: false, feedback: 'Desnecessário se houver material de reserva. Acione o estoque de reserva ou realize reprocessamento emergencial.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_rosa',
+        text: [
+          'A CME quer implantar rastreabilidade por código de barras em todos os instrumentais.',
+          'Qual é o critério mínimo de rastreabilidade exigido pela RDC 15/2012?',
+          '(Kurcgant cap.12 — Gestão de Recursos Materiais)',
+        ],
+        choices: [
+          { text: 'Identificar o lote de esterilização, o equipamento usado, o operador, a data/hora e o destino de cada item processado.', correct: true, tooltip: 'RDC 15/2012: rastreabilidade completa do processo de esterilização', feedback: 'Perfeito! A RDC 15/2012 exige rastreabilidade completa: lote, autoclave, operador, data e destino. O código de barras facilita, mas o conteúdo mínimo é regulamentado.', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'Registrar apenas o tipo de material e a data de esterilização.', correct: false, feedback: 'Insuficiente. Sem identificar o equipamento e operador, não é possível rastrear falhas em caso de infecção.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Não há obrigatoriedade — rastreabilidade é recomendação, não exigência legal.', correct: false, feedback: 'Incorreto. A RDC 15/2012 da ANVISA tem força de lei e exige rastreabilidade do processo de esterilização.', effect: (s) => ({ prestige: s.prestige - 3 }) },
+          { text: 'Guardar as embalagens usadas por 30 dias como evidência do processo.', correct: false, feedback: 'Insuficiente. Guardar embalagem não substitui o registro formal de rastreabilidade exigido pela RDC 15/2012.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_rosa',
+        text: [
+          'O autoclave da CME reprovnou no teste Bowie-Dick esta manhã.',
+          'Há 40 pacientes cirúrgicos marcados para hoje.',
+          'Qual é a conduta imediata correta?',
+        ],
+        choices: [
+          { text: 'Interditar o autoclave, acionar manutenção imediatamente, notificar o CC e verificar material esterilizado no turno anterior para rastreamento.', correct: true, tooltip: 'Teste Bowie-Dick negativo = autoclave interditado imediatamente (RDC 15/2012)', feedback: 'Correto! Falha no Bowie-Dick indica problemas de remoção de ar — compromete esterilização. Interdição imediata e rastreamento retroativo são obrigatórios. (RDC 15/2012)', effect: (s) => ({ prestige: s.prestige + 35 }) },
+          { text: 'Repetir o teste Bowie-Dick mais uma vez antes de tomar qualquer decisão.', correct: false, feedback: 'Não se repete Bowie-Dick para "confirmar". Falha = interdição imediata. Uma segunda falha só adiciona atraso perigoso.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Continuar usando o autoclave e comunicar a falha apenas ao final do dia.', correct: false, feedback: 'Perigoso! Material processado em autoclave com falha não é confiável. Todas as cirurgias estariam em risco.', effect: (s) => ({ prestige: s.prestige - 15 }) },
+          { text: 'Usar esterilização a frio com glutaraldeído para todos os materiais do dia.', correct: false, feedback: 'Glutaraldeído não substitui vapor para todos os materiais e tem restrições da ANVISA. Acione contingência planejada.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+        ],
+      }],
+    ],
   },
   {
     id: 'nutricionista_clara',
@@ -1267,6 +1605,50 @@ export const NPC_DEFS: NPCDef[] = [
         ],
         choices: [{ text: 'Obrigada, Clara! Boa dica.' }],
       },
+    ],
+    dialoguePools: [
+      [{
+        id: 'pool1_clara',
+        text: [
+          'Paciente crítico, 72h de internação na UTI, ainda sem dieta por ordem médica.',
+          'O residente disse que vai "aguardar a estabilização hemodinâmica" antes de nutrir.',
+          'Qual é a recomendação baseada em evidências para nutrição em terapia intensiva?',
+        ],
+        choices: [
+          { text: 'Iniciar nutrição enteral precoce em 24–48h mesmo em pacientes com instabilidade hemodinâmica relativa, conforme ASPEN/ESPEN.', correct: true, tooltip: 'ASPEN/ESPEN: nutrição enteral precoce em 24-48h reduz mortalidade e complicações', feedback: 'Correto! As diretrizes ASPEN (2016) e ESPEN recomendam nutrição enteral em 24–48h. Esperar "estabilização completa" aumenta catabolismo e piora desfechos. (Kurcgant cap.9 — equipe multiprofissional)', effect: (s) => ({ prestige: s.prestige + 30, energy: Math.min((s as any).energy + 5, 100) }) },
+          { text: 'Aguardar 5–7 dias para iniciar dieta parenteral total como estratégia mais segura.', correct: false, feedback: 'Incorreto. Jejum prolongado é danoso. Nutrição enteral é preferida à parenteral sempre que houver trato funcionante.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'Não intervir — a decisão de nutrir é exclusivamente médica, enfermagem não tem papel.', correct: false, feedback: 'Incorreto. A terapia nutricional é decisão multiprofissional. Enfermagem e nutrição têm papel ativo na equipe de EMTN.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'Iniciar nutrição oral, pois é mais fisiológica e o paciente deve se alimentar normalmente.', correct: false, feedback: 'Paciente crítico entubado não pode receber nutrição oral. Enteral por sonda é a via indicada.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_clara',
+        text: [
+          'A triagem nutricional identificou 60% dos pacientes internados com risco nutricional.',
+          'Qual instrumento validado é mais adequado para triagem nutricional em adultos hospitalizados?',
+          '(Kurcgant cap.9 — Equipe Multiprofissional)',
+        ],
+        choices: [
+          { text: 'NRS-2002 (Nutritional Risk Screening) — validado especificamente para pacientes hospitalizados adultos.', correct: true, tooltip: 'NRS-2002: ferramenta recomendada pela ESPEN para triagem hospitalar', feedback: 'Excelente! O NRS-2002 é o instrumento recomendado pela ESPEN para triagem nutricional hospitalar em adultos. O MNA é para idosos e o MUST para ambientes gerais. (ESPEN 2017)', effect: (s) => ({ prestige: s.prestige + 28 }) },
+          { text: 'IMC abaixo de 18,5 — critério simples e acessível para qualquer equipe.', correct: false, feedback: 'IMC isolado é insuficiente para triagem nutricional hospitalar. Não avalia dinamismo do quadro clínico.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'MNA (Mini Nutritional Assessment) — ferramenta universal para qualquer paciente.', correct: false, feedback: 'O MNA é validado especificamente para idosos. Para adultos hospitalizados em geral, use o NRS-2002.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Albumina sérica abaixo de 3g/dL como único critério de risco nutricional.', correct: false, feedback: 'Albumina é marcador inflamatório — em infecção aguda cai por redistribuição, não por desnutrição. Não é critério isolado.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_clara',
+        text: [
+          'O médico prescreveu dieta parenteral total para um paciente com abdome funcionante.',
+          'Como membro da EMTN (Equipe de Terapia Nutricional), qual é sua responsabilidade?',
+          '(Kurcgant cap.9 — Trabalho em Equipe Multiprofissional)',
+        ],
+        choices: [
+          { text: 'Levar o caso à EMTN, apresentar evidências de que nutrição enteral é preferível e propor mudança de conduta fundamentada.', correct: true, tooltip: 'EMTN: decisão multiprofissional baseada em evidências (RDC 63/2000)', feedback: 'Correto! A RDC 63/2000 da ANVISA regulamenta a EMTN. Decisões nutricionais devem ser multiprofissionais e baseadas em evidências. O profissional de saúde deve contestar condutas inadequadas. (Kurcgant cap.9)', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'Aceitar a prescrição médica sem questionar — hierarquia deve ser respeitada.', correct: false, feedback: 'Incorreto. Hierarquia não justifica silêncio diante de condutas que prejudicam o paciente. A EMTN é espaço de decisão colegiada.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Não preparar a nutrição parenteral como forma de protesto silencioso.', correct: false, feedback: 'Recusa sem comunicação é abandono. O correto é comunicar o questionamento formalmente na EMTN.', effect: (s) => ({ prestige: s.prestige - 8 }) },
+          { text: 'Instalar a parenteral e registrar no prontuário que foi contra a conduta.', correct: false, feedback: 'Registro de discordância é importante, mas insuficiente. O questionamento deve ser feito antes da administração, não depois.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+        ],
+      }],
     ],
   },
   {
@@ -1355,6 +1737,50 @@ export const NPC_DEFS: NPCDef[] = [
         choices: [{ text: 'Boa gestão, Maria!' }],
       },
     ],
+    dialoguePools: [
+      [{
+        id: 'pool1_maria',
+        text: [
+          'Precisamos calcular o dimensionamento de pessoal para a Enfermaria Clínica.',
+          '28 leitos, SCP médio = 18,2 pontos/paciente/dia, índice de segurança técnica 15%.',
+          'Usando a metodologia de Gaidzinski, qual é o total de profissionais necessários? (Kurcgant cap.10)',
+        ],
+        choices: [
+          { text: 'Calcular: horas necessárias = (pontos × fator de complexidade) ÷ horas diárias × IST. O cálculo deve contemplar coberturas de folgas e férias.', correct: true, tooltip: 'Gaidzinski (1998) — metodologia padrão de dimensionamento de enfermagem no Brasil (Kurcgant cap.10)', feedback: 'Excelente! A metodologia de Gaidzinski (1998) é a referência para dimensionamento de enfermagem no Brasil, adaptada pela Resolução COFEN 543/2017. IST de 15% cobre ausenteísmo. (Kurcgant, 2016 cap.10)', effect: (s) => ({ prestige: s.prestige + 35 }) },
+          { text: 'Calcular 1 técnico para cada 4 pacientes e 1 enfermeiro para cada 8 — regra simples e prática.', correct: false, feedback: 'Regra simplificada não considera carga de trabalho real. O COFEN exige cálculo pelo SCP para validar o dimensionamento. (COFEN 543/2017)', effect: (s) => ({ prestige: s.prestige + 5 }) },
+          { text: 'Basear no número de funcionários disponíveis e ajustar conforme necessidade diária.', correct: false, feedback: 'Incorreto. O dimensionamento baseado na disponibilidade — não na necessidade — perpetua déficits estruturais.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'Usar o número de funcionários do mês anterior como referência, ajustando por férias.', correct: false, feedback: 'Método inaceitável. Referência histórica sem análise de carga de trabalho não reflete a necessidade real.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_maria',
+        text: [
+          'Duas enfermeiras do plantão estão em conflito aberto — afetando a equipe toda.',
+          'Uma acusa a outra de não dividir as atividades de forma equitativa.',
+          'Como supervisora de enfermagem, qual é a sua abordagem? (Kurcgant cap.5)',
+        ],
+        choices: [
+          { text: 'Realizar mediação individual com cada parte, levantar os fatos objetivamente e depois promover reunião conjunta com foco em solução, não em culpa.', correct: true, tooltip: 'Kurcgant cap.5 — Negociação e Gestão de Conflitos: mediação estruturada', feedback: 'Correto! A mediação estruturada (individual → conjunta) é a estratégia mais eficaz para conflitos interpessoais. Foco na solução e comunicação não-violenta. (Kurcgant cap.5)', effect: (s) => ({ prestige: s.prestige + 32 }) },
+          { text: 'Reunir as duas ao mesmo tempo e exigir que se entendam imediatamente.', correct: false, feedback: 'Reunião conjunta sem preparo individual frequentemente escala o conflito. Ouça cada parte separadamente primeiro.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Ignorar o conflito — profissionais adultas devem resolver seus próprios problemas.', correct: false, feedback: 'Incorreto. Conflitos não geridos afetam a qualidade da assistência e o bem-estar da equipe. A intervenção é responsabilidade gerencial. (Kurcgant cap.5)', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Transferir a profissional mais resistente para outro setor para eliminar o conflito.', correct: false, feedback: 'Transferência sem resolução do conflito apenas desloca o problema. A mediação deve ser tentada primeiro.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_maria',
+        text: [
+          'A equipe de enfermagem não está realizando a Sistematização da Assistência de Enfermagem (SAE) adequadamente.',
+          'Os registros no prontuário estão incompletos — sem diagnósticos nem prescrições de enfermagem.',
+          'Qual é o respaldo legal para exigir a implementação da SAE? (Kurcgant cap.3)',
+        ],
+        choices: [
+          { text: 'Lei 7.498/86 (Exercício Profissional) + Resolução COFEN 358/2009 — SAE é obrigatória e privativa do enfermeiro.', correct: true, tooltip: 'Resolução COFEN 358/2009: SAE obrigatória em todas as instituições de saúde', feedback: 'Correto! A Res. COFEN 358/2009 torna a SAE obrigatória em todos os ambientes de saúde. A Lei 7.498/86 define o Processo de Enfermagem como atividade privativa do enfermeiro. (Kurcgant cap.3)', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'SAE é apenas uma recomendação acadêmica — não tem força de lei obrigatória.', correct: false, feedback: 'Incorreto. A Resolução COFEN 358/2009 tem força normativa — é obrigatória. Descumpri-la sujeita a sanções éticas.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'A obrigatoriedade é da Lei 9.394/96 (LDB) — responsabilidade das escolas de enfermagem.', correct: false, feedback: 'Incorreto. A LDB trata de educação, não da prática profissional. O respaldo é a Lei 7.498/86 e Res. COFEN 358/2009.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'Cada hospital decide se implementa SAE conforme suas necessidades e cultura organizacional.', correct: false, feedback: 'Incorreto. A COFEN 358/2009 é clara: SAE é obrigatória independente das preferências institucionais.', effect: (s) => ({ prestige: s.prestige - 2 }) },
+        ],
+      }],
+    ],
   },
   {
     id: 'dr_oliveira',
@@ -1411,6 +1837,50 @@ export const NPC_DEFS: NPCDef[] = [
         ],
         choices: [{ text: 'Trabalhamos bem em equipe, doutor!' }],
       },
+    ],
+    dialoguePools: [
+      [{
+        id: 'pool1_oliveira',
+        text: [
+          'Vamos revisar os indicadores de qualidade da UTI este mês.',
+          'A taxa de infecção de corrente sanguínea associada a cateter (ICSAC) está em 6,2/1000 cateteres-dia.',
+          'Qual meta é recomendada pelos protocolos de segurança do paciente? (Kurcgant cap.6)',
+        ],
+        choices: [
+          { text: 'Meta: < 2/1000 cateteres-dia (benchmarking NHSN/CDC). Revisar técnica de inserção, manutenção e critério de retirada do cateter.', correct: true, tooltip: 'NHSN/CDC: meta ICSAC < 2/1000 cateteres-dia em UTI', feedback: 'Correto! A meta NHSN/CDC para ICSAC em UTI é < 2/1000 cateteres-dia. Com 6,2, o setor está 3× acima do benchmark. Revisão do bundle de cateter é urgente. (Kurcgant cap.6)', effect: (s) => ({ prestige: s.prestige + 35 }) },
+          { text: 'Qualquer taxa abaixo de 10/1000 é aceitável para UTI de alta complexidade.', correct: false, feedback: 'Incorreto. A meta de 10/1000 é muito acima do benchmark. A ONA e NHSN não aceitam essa margem como satisfatória.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'Indicadores de infecção hospitalar não são de responsabilidade da enfermagem, apenas da CCIH.', correct: false, feedback: 'Incorreto. Enfermagem é corresponsável pelos indicadores — a CCIH reporta, mas a prevenção é executada pela equipe assistencial.', effect: (s) => ({ prestige: s.prestige - 3 }) },
+          { text: 'Taxa de 6,2 é esperada para UTI nível III — não é necessário nenhuma intervenção urgente.', correct: false, feedback: 'Errado. Toda ICSAC é potencialmente evitável. A abordagem zero-tolerância é o padrão atual de qualidade. (IHI/NHSN)', effect: (s) => ({ prestige: s.prestige + 0 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_oliveira',
+        text: [
+          'A equipe multiprofissional da UTI está discutindo sobre o modelo de passagem de plantão.',
+          'Qual método de comunicação estruturada reduz mais erros na transição de cuidados?',
+          '(Kurcgant cap.9 — Trabalho em Equipe)',
+        ],
+        choices: [
+          { text: 'SBAR (Situação, Background, Avaliação, Recomendação) — ferramenta validada internacionalmente para comunicação de alta complexidade.', correct: true, tooltip: 'SBAR: padrão internacional OMS para comunicação na passagem de plantão', feedback: 'Correto! O SBAR (ou ISBAR com Identificação) é recomendado pela OMS e Joint Commission. Reduz erros de comunicação em até 60% na passagem de plantão. (Kurcgant cap.9)', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'Comunicação verbal informal entre enfermeiros é suficiente — documentação demora muito.', correct: false, feedback: 'Perigoso. Comunicação informal sem estrutura é a principal causa de eventos adversos na transição de cuidado.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Entregar um resumo impresso e o profissional que chega lê sozinho sem discussão.', correct: false, feedback: 'Insuficiente. A troca bidirecional de informações é essencial — dúvidas devem ser esclarecidas no momento.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Cada profissional verifica o prontuário eletrônico no início do turno sem passagem formal.', correct: false, feedback: 'O prontuário não captura situações emergentes. A passagem ativa é necessária para informações críticas recentes.', effect: (s) => ({ prestige: s.prestige + 4 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_oliveira',
+        text: [
+          'Um familiar exige que a equipe utilize tratamento experimental não aprovado no paciente.',
+          'O paciente está sedado e não pode expressar sua vontade.',
+          'Qual é a conduta ético-legal correta? (Kurcgant cap.2 — Ética em Enfermagem)',
+        ],
+        choices: [
+          { text: 'Explicar que tratamentos devem ter embasamento ético-científico, consultar o Comitê de Ética e documentar a decisão no prontuário.', correct: true, tooltip: 'Código de Ética dos Profissionais de Enfermagem (COFEN 564/2017) — autonomia e beneficência', feedback: 'Correto! O Código de Ética COFEN 564/2017 e a Resolução CFM 1.995/2012 orientam: o familiar não tem poder de exigir tratamento não-indicado. Comitê de Ética é a instância adequada. (Kurcgant cap.2)', effect: (s) => ({ prestige: s.prestige + 35 }) },
+          { text: 'Aplicar o tratamento para evitar conflito com a família e possível processo judicial.', correct: false, feedback: 'Perigoso! Tratamentos sem embasamento podem causar dano. O medo de processo não justifica prática não-ética.', effect: (s) => ({ prestige: s.prestige - 10 }) },
+          { text: 'Negar categoricamente sem explicação — é decisão médica, não da família.', correct: false, feedback: 'A negativa sem diálogo é eticamente inadequada. O familiar deve ser acolhido e orientado sobre os critérios de decisão.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Consultar apenas o médico plantonista e seguir o que ele decidir.', correct: false, feedback: 'Insuficiente para questões éticas complexas. O Comitê de Ética existe exatamente para casos como esse.', effect: (s) => ({ prestige: s.prestige + 4 }) },
+        ],
+      }],
     ],
   },
   {
@@ -1471,6 +1941,50 @@ export const NPC_DEFS: NPCDef[] = [
         choices: [{ text: 'É um privilégio trabalhar aqui!' }],
       },
     ],
+    dialoguePools: [
+      [{
+        id: 'pool1_santos',
+        text: [
+          'Vamos administrar quimioterapia em um paciente com linfoma de alto grau.',
+          'O protocolo exige dupla checagem antes da administração.',
+          'Quais são os 5 critérios obrigatórios da dupla checagem em quimioterapia? (INCA/OMS)',
+        ],
+        choices: [
+          { text: 'Verificar: identidade do paciente, medicamento correto, dose, via e hora — seguindo os 5 certos expandidos para quimioterapia.', correct: true, tooltip: 'INCA: dupla checagem dos 5 certos em quimioterapia + protocolo correto', feedback: 'Correto! Em quimioterapia, os "5 certos" (paciente, medicamento, dose, via, hora) são verificados por 2 profissionais independentes. Erro pode ser fatal. (Kurcgant cap.6 — Qualidade e Segurança)', effect: (s) => ({ prestige: s.prestige + 35 }) },
+          { text: 'Verificar apenas o nome do paciente e o frasco — o resto é responsabilidade da farmácia.', correct: false, feedback: 'Perigoso! Todos os 5 critérios devem ser verificados pela enfermagem antes da administração, independente da farmácia.', effect: (s) => ({ prestige: s.prestige - 10 }) },
+          { text: 'A dupla checagem é recomendação, não obrigação — basta que um profissional confira.', correct: false, feedback: 'Incorreto. A dupla checagem é obrigatória para medicamentos de alta vigilância como quimioterápicos. (ANVISA/ISMP)', effect: (s) => ({ prestige: s.prestige - 3 }) },
+          { text: 'Verificar apenas o peso do paciente para confirmar a dose calculada está correta.', correct: false, feedback: 'Insuficiente. Peso é um critério de cálculo, não substitui a verificação completa dos 5 certos na beira do leito.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_santos',
+        text: [
+          'Uma paciente com câncer de mama avançado está com dor crônica intensa (EVA 8/10).',
+          'O médico ainda não prescreveu analgesia adequada.',
+          'Qual é a responsabilidade da enfermagem segundo cuidados paliativos? (Kurcgant cap.2 — Ética)',
+        ],
+        choices: [
+          { text: 'Registrar a avaliação de dor no prontuário, notificar o médico de forma estruturada (SBAR) e advogado pelos direitos do paciente ao controle de dor.', correct: true, tooltip: 'OMS: controle de dor é direito humano — enfermagem é advogada do paciente', feedback: 'Correto! O controle de dor é direito reconhecido pela OMS em cuidados paliativos. A enfermagem tem papel ativo de avaliação, registro e advocacia, não apenas de administrar quando prescrito. (Kurcgant cap.2)', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'Aguardar passagem de plantão para comunicar ao próximo médico que assumir.', correct: false, feedback: 'Incorreto. Dor intensa (EVA 8/10) é urgência — não pode aguardar troca de turno.', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Administrar medicação analgésica que a paciente tomava em casa sem prescrição hospitalar.', correct: false, feedback: 'Ilegal e perigoso. Administração sem prescrição é infração ética e legal, mesmo com boa intenção.', effect: (s) => ({ prestige: s.prestige - 10 }) },
+          { text: 'Explicar para a paciente que é preciso aguardar — a prescrição é exclusivamente médica.', correct: false, feedback: 'Passividade inaceitável. Enfermagem deve agir ativamente pela resolução do problema, não apenas comunicar limitações.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_santos',
+        text: [
+          'A família de um paciente em fase terminal pede para "fazer tudo" e não aceita discutir cuidados paliativos.',
+          'O paciente previamente havia expressado querer conforto sem medidas extraordinárias.',
+          'Como abordar essa situação segundo a ética em enfermagem? (Kurcgant cap.2)',
+        ],
+        choices: [
+          { text: 'Valorizar a autonomia prévia do paciente, conduzir reunião familiar com equipe multiprofissional e facilitar processo de elaboração do luto antecipatório.', correct: true, tooltip: 'Kurcgant cap.2: princípio da autonomia e cuidado centrado no paciente', feedback: 'Correto! O princípio da autonomia (vontade prévia do paciente) deve prevalecer. A reunião familiar multiprofissional e o acompanhamento do luto antecipatório são boas práticas de cuidados paliativos. (Kurcgant cap.2)', effect: (s) => ({ prestige: s.prestige + 35 }) },
+          { text: 'Atender o pedido da família e iniciar todas as medidas de suporte para evitar conflito.', correct: false, feedback: 'Incorreto. Priorizar o pedido da família sobre a vontade do paciente viola o princípio de autonomia. (Kurcgant cap.2)', effect: (s) => ({ prestige: s.prestige - 5 }) },
+          { text: 'Informar que a decisão é exclusivamente médica e que a enfermagem não tem papel nessa discussão.', correct: false, feedback: 'Incorreto. A enfermagem tem papel central nos cuidados paliativos e nas discussões sobre fim de vida. (Kurcgant cap.2)', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'Acionar juridicamente a família para garantir a vontade do paciente de forma compulsória.', correct: false, feedback: 'Desnecessário como primeira medida. A mediação multiprofissional e o diálogo devem ser esgotados primeiro.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+        ],
+      }],
+    ],
   },
   {
     id: 'enf_pedro',
@@ -1529,6 +2043,50 @@ export const NPC_DEFS: NPCDef[] = [
         ],
         choices: [{ text: 'Bela missão, Pedro!' }],
       },
+    ],
+    dialoguePools: [
+      [{
+        id: 'pool1_pedro',
+        text: [
+          'O Banco de Leite do HUAP precisa de adequação urgente.',
+          'Qual é a temperatura correta de armazenamento do leite humano cru no BLH?',
+          '(RDC 171/2006 ANVISA — Bancos de Leite Humano)',
+        ],
+        choices: [
+          { text: 'Leite cru: refrigerado a -3 a 5°C por até 12h ou congelado a -18°C. Leite pasteurizado: 2 a 6°C por até 12h.', correct: true, tooltip: 'RDC 171/2006 ANVISA: temperatura e tempo de armazenamento no BLH', feedback: 'Correto! A RDC 171/2006 da ANVISA é rigorosa sobre temperatura do BLH. Leite cru deve ser coletado e processado no prazo — qualquer desvio implica descarte obrigatório.', effect: (s) => ({ prestige: s.prestige + 28 }) },
+          { text: 'Temperatura ambiente é suficiente por até 4 horas — é leite materno, não um medicamento.', correct: false, feedback: 'Perigoso! Leite humano em temperatura ambiente cresce bactérias rapidamente. A RDC 171/2006 é muito estrita sobre controle térmico.', effect: (s) => ({ prestige: s.prestige - 8 }) },
+          { text: 'Qualquer refrigeração abaixo de 10°C é aceitável — o importante é não congelar.', correct: false, feedback: 'Incorreto. A faixa exata é -3 a 5°C para cru e 2 a 6°C para pasteurizado. Temperatura de 10°C não é adequada.', effect: (s) => ({ prestige: s.prestige + 2 }) },
+          { text: 'O tempo não importa se o leite foi coletado em condições estéreis.', correct: false, feedback: 'Incorreto. Mesmo em condições estéreis, o tempo e a temperatura são determinantes para a segurança do receptor.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+        ],
+      }],
+      [{
+        id: 'pool2_pedro',
+        text: [
+          'Uma parturiente deseja ter seu companheiro presente durante o trabalho de parto.',
+          'A equipe diz que "a norma do hospital" não permite acompanhante na sala de parto.',
+          'Qual é o respaldo legal para garantir esse direito? (Humanização)',
+        ],
+        choices: [
+          { text: 'Lei 11.108/2005 — garante à parturiente o direito a acompanhante durante trabalho de parto, parto e pós-parto imediato em serviços do SUS.', correct: true, tooltip: 'Lei 11.108/2005: direito à presença de acompanhante no parto — SUS', feedback: 'Correto! A Lei 11.108/2005 garante o direito ao acompanhante no parto em todos os serviços do SUS. Normas internas não podem contrariar lei federal. (PNH/MS)', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'Não há lei específica — a decisão é do obstetra responsável pelo parto.', correct: false, feedback: 'Incorreto. A Lei 11.108/2005 é clara e de cumprimento obrigatório. O obstetra não pode negar esse direito.', effect: (s) => ({ prestige: s.prestige - 3 }) },
+          { text: 'O acompanhante pode entrar apenas se a parturiente estiver em risco de vida.', correct: false, feedback: 'Incorreto. O direito é incondicional — não depende do estado clínico da parturiente.', effect: (s) => ({ prestige: s.prestige + 0 }) },
+          { text: 'Depende do protocolo interno de cada hospital — cada instituição define suas regras.', correct: false, feedback: 'Incorreto. Protocolos internos não podem contrariar lei federal. A Lei 11.108/2005 prevalece sobre qualquer norma interna.', effect: (s) => ({ prestige: s.prestige - 2 }) },
+        ],
+      }],
+      [{
+        id: 'pool3_pedro',
+        text: [
+          'Uma mãe adolescente está com dificuldade para amamentar seu recém-nascido.',
+          'O bebê está perdendo peso acima do permitido no 3º dia de vida.',
+          'Qual é a conduta prioritária da enfermagem no Alojamento Conjunto?',
+        ],
+        choices: [
+          { text: 'Avaliar a pega, posição e frequência das mamadas, orientar a mãe com técnica demonstrativa e acionar o suporte de lactação (BLH/IBCLC) se necessário.', correct: true, tooltip: 'OMS/MS: aleitamento materno — papel da enfermagem no suporte ativo no alojamento conjunto', feedback: 'Correto! A avaliação ativa da amamentação (pega, posição, frequência) e o suporte técnico são responsabilidade da equipe de enfermagem. Perda > 10% do peso neonatal exige ação imediata. (OMS/IMALAC)', effect: (s) => ({ prestige: s.prestige + 30 }) },
+          { text: 'Oferecer complementação com fórmula para recuperar o peso rapidamente.', correct: false, feedback: 'Incorreto como primeira conduta. Suplementação sem avaliação adequada da amamentação pode comprometer o aleitamento materno exclusivo desnecessariamente.', effect: (s) => ({ prestige: s.prestige + 3 }) },
+          { text: 'Orientar a mãe a oferecer o seio de hora em hora e não se preocupar com o peso.', correct: false, feedback: 'Insuficiente. Perda de > 10% do peso ao 3º dia é sinal de alerta que requer avaliação técnica — não apenas reasseguramento verbal.', effect: (s) => ({ prestige: s.prestige + 4 }) },
+          { text: 'Comunicar ao pediatra e aguardar orientação médica antes de qualquer intervenção.', correct: false, feedback: 'Passivo demais. A avaliação da amamentação é competência da enfermagem — não requer aguardar médico para iniciar suporte.', effect: (s) => ({ prestige: s.prestige + 5 }) },
+        ],
+      }],
     ],
   },
   {

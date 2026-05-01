@@ -62,4 +62,20 @@ See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and pa
 - **Menu UI**: removed `pt-16` and `justify-center` from `AppUI`; the menu buttons are now anchored to the right-center (`right-[8%] top-1/2 -translate-y-1/2`), and the help panel is centered absolutely.
 - **QTE**: `HUDScene` crisis timer extended from 40s → 90s for readability.
 - **Walking & stuck NPCs**: `Player` and `NPC` physics bodies were tightened to feet-only (`16×14` at offset `14,46`) so characters no longer snag on door jambs/props. NPC `update()` now uses a 12px waypoint tolerance (was 4) and a 1500ms stuck-recovery that auto-skips a waypoint when the NPC barely moves.
-- **Dialog feedback**: replaced the generic `"Pode contar comigo"` / `"Certo, entendi"` fallbacks in `DialogScene` with role-aware feedback pools (doctor, nurse, technician, admin, receptionist, other) for `start` / `complete` / `idle` outcomes.
+- **Dialog feedback**: replaced the generic fallbacks in `DialogScene` with role-aware feedback pools (doctor, nurse, technician, admin, receptionist, other) for `start` / `complete` / `idle` outcomes.
+
+### v3.2 — Full Dialogue Pools + Room Equipment Overhaul (2026-05-01)
+**Dialogue Pools (all 12 NPCs):**
+- All 12 NPCs now have 3 `dialoguePools` each (9 total MCQ questions per NPC), all grounded in Kurcgant (2016) chapters, with `correct`, `feedback`, `tooltip`, and `effect` fields.
+- New NPCs completed: `dr_oliveira` (ICSAC/SBAR/ética), `dra_santos` (dupla-checagem quimioterapia/dor paliativa/autonomia), `enf_pedro` (RDC171/Lei11108/aleitamento materno).
+- `NPC.ts` getDialogue() rotates pools by `conversationCount % pools.length`; choices are Fisher-Yates shuffled each conversation.
+
+**Room Equipment (GameScene.ts):**
+- `populateRoom()` completely rewritten: each room now has hand-placed, semantically correct equipment instead of a grid loop.
+- 18 new drawing methods added: `drawVentilator`, `drawIVPole`, `drawMaternityBed`, `drawBassinet`, `drawBreastPumpStation`, `drawCrashCart`, `drawShelvingUnit`, `drawRefrigerator`, `drawLabBench`, `drawCentrifuge`, `drawBioanalyzer`, `drawAutoclave`, `drawExecutiveDesk`, `drawReceptionCounter`, `drawKitchenCounter`, `drawXRayViewer`, `drawParallelBars`, `drawExerciseMat`.
+- ICU: ventilators + IV poles beside each bed, central nursing desk. MATERNITY: pink beds + bassinets + breast pump station. EMERGENCY: crash carts + defibrillators + triage desk. PHARMACY: dispensing counters + tall shelving + medicine fridge. LAB: microscope bench + centrifuge + bioanalyzer. CME: dual autoclaves + sterilization counters. RADIOLOGY: CT scanner + X-ray viewer lightbox. REHAB: parallel bars + exercise mats. ADMIN: executive desk + filing cabinets + waiting chairs. RECEPTION: reception counter with bells + waiting chair rows.
+
+**TypeScript:**
+- Fixed `TS7030` in `AchievementToast.tsx` (missing `return undefined`).
+- Fixed `TS2554` in `PointExplosion.tsx` (`useRef` now initialized with `undefined` argument).
+- Full `tsc --noEmit` passes with zero errors.

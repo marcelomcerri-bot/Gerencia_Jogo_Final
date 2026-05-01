@@ -212,92 +212,235 @@ export class GameScene extends Phaser.Scene {
 
   // Draw enhanced props
   private populateRoom(g: Phaser.GameObjects.Graphics, tid: number, r1: number, r2: number, c1: number, c2: number) {
-    const w = c2 - c1 + 1;
-    const h = r2 - r1 + 1;
+    const midC = Math.floor((c1 + c2) / 2);
+    const midR = Math.floor((r1 + r2) / 2);
 
-    for (let r = r1 + 1; r < r2; r += 2) {
-      for (let c = c1 + 1; c < c2; c += 2) {
-        const bx = c * TILE_SIZE, by = r * TILE_SIZE;
-        
-        if (tid === TILE_ID.WARD || tid === TILE_ID.ICU || tid === TILE_ID.MATERNITY) {
-          if (c % 3 === 0) {
-            this.drawHospitalBed(g, bx, by, tid === TILE_ID.ICU);
-            this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
-          }
-        } else if (tid === TILE_ID.ADMIN || tid === TILE_ID.RECEPTION) {
-          if (c % 4 === 1 && r % 3 === 1) {
-            this.drawOfficeDesk(g, bx, by);
-            this.interactionPoints.push({ x: bx, y: by, type: 'work' });
-          } else if (tid === TILE_ID.RECEPTION && c % 2 === 0 && r % 3 === 0) {
-            this.drawWaitingChairs(g, bx, by);
-            this.interactionPoints.push({ x: bx, y: by, type: 'sit' });
-          } else if (tid === TILE_ID.ADMIN && c % 3 === 0 && r === r2 - 1) {
-            this.drawFilingCabinet(g, bx, by);
-          }
-          if (c === c2 - 1 && r === r1 + 1) {
-             this.drawPottedPlant(g, bx, by);
-          }
-        } else if (tid === TILE_ID.LAB || tid === TILE_ID.CME || tid === TILE_ID.PHARMACY) {
-          if (r === r1 + 1 && c % 3 === 0) {
-            this.drawLabCounter(g, bx, by, c2-c1 > 4 ? 64 : 32);
-            this.interactionPoints.push({ x: bx, y: by, type: 'work' });
-          } else if (r === r2 - 1 && c % 3 === 0) {
-            this.drawCabinet(g, bx, by);
-          }
-        } else if (tid === TILE_ID.BREAK) {
-           if (r === r1 + 2 && c === c1 + 2) {
-             this.drawDiningTable(g, bx, by);
-             this.interactionPoints.push({ x: bx, y: by, type: 'rest' });
-           }
-           if (r === r2 - 1 && c === c1 + 1) this.drawVendingMachine(g, bx, by);
-        } else if (tid === TILE_ID.ONCOLOGY || tid === TILE_ID.REHAB) {
-           if (c % 3 === 0) {
-             this.drawChemoChair(g, bx, by);
-             this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
-           }
-        } else if (tid === TILE_ID.EMERGENCY) {
-           // Trauma stretchers along one wall, defibrillator near entrance
-           if (c % 3 === 0 && r % 2 === 0) {
-             this.drawTraumaStretcher(g, bx, by);
-             this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
-           }
-           if (r === r1 + 1 && c === c1 + 1) {
-             this.drawDefibrillator(g, bx, by);
-             this.interactionPoints.push({ x: bx, y: by, type: 'work' });
-           }
-        } else if (tid === TILE_ID.RADIOLOGY) {
-           // One CT scanner centerpiece + supporting cabinets
-           if (r === r1 + 2 && c === c1 + 2) {
-             this.drawCTScanner(g, bx, by);
-             this.interactionPoints.push({ x: bx, y: by, type: 'work' });
-           } else if (r === r2 - 1 && c % 3 === 0) {
-             this.drawCabinet(g, bx, by);
-           }
-        } else if (tid === TILE_ID.NURSING) {
-           // Long counter desk + filing cabinets (the central nursing station)
-           if (r === r1 + 1 && c % 3 === 0) {
-             this.drawNursingDesk(g, bx, by);
-             this.interactionPoints.push({ x: bx, y: by, type: 'work' });
-           } else if (r === r2 - 1 && c % 3 === 0) {
-             this.drawFilingCabinet(g, bx, by);
-           }
-        } else if (tid === TILE_ID.OUTPATIENT) {
-           // Exam tables in a row with chairs scattered
-           if (c % 3 === 0 && r % 2 === 0) {
-             this.drawExamTable(g, bx, by);
-             this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
-           }
-           if (c === c2 - 1 && r === r1 + 1) this.drawPottedPlant(g, bx, by);
-        } else if (tid === TILE_ID.PSYCH) {
-           // Therapy sofa + plants for a calm atmosphere
-           if (r === r1 + 1 && c === c1 + 1) {
-             this.drawTherapySofa(g, bx, by);
-             this.interactionPoints.push({ x: bx, y: by, type: 'sit' });
-           } else if (c % 3 === 0 && r === r2 - 1) {
-             this.drawTherapyPlant(g, bx, by);
-           }
+    // ── ICU — highly-monitored beds with ventilators and IV poles
+    if (tid === TILE_ID.ICU) {
+      let bedCol = c1 + 1;
+      while (bedCol < c2 - 1) {
+        const bx = bedCol * TILE_SIZE, by = (r1 + 1) * TILE_SIZE;
+        this.drawHospitalBed(g, bx, by, true);
+        this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
+        this.drawVentilator(g, bx + 34, by - 2);
+        this.drawIVPole(g, bx - 14, by + 8);
+        bedCol += 4;
+      }
+      // Central nursing monitor strip
+      const mx = midC * TILE_SIZE;
+      this.drawNursingDesk(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: mx, y: (r2 - 2) * TILE_SIZE, type: 'work' });
+    }
+
+    // ── WARD — regular beds with bedside tables, IV poles
+    else if (tid === TILE_ID.WARD) {
+      let bedCol = c1 + 1;
+      let row = r1 + 1;
+      while (bedCol < c2 - 1) {
+        const bx = bedCol * TILE_SIZE, by = row * TILE_SIZE;
+        this.drawHospitalBed(g, bx, by, false);
+        this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
+        this.drawIVPole(g, bx - 12, by + 6);
+        bedCol += 4;
+        if (bedCol >= c2 - 1 && row === r1 + 1) { bedCol = c1 + 1; row = r2 - 4; }
+      }
+      // Filing cabinet + plant
+      this.drawFilingCabinet(g, (c2 - 2) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.drawPottedPlant(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+    }
+
+    // ── MATERNITY — maternity beds + bassinets + soft decor
+    else if (tid === TILE_ID.MATERNITY) {
+      let bedCol = c1 + 1;
+      while (bedCol < c2 - 1) {
+        const bx = bedCol * TILE_SIZE, by = (r1 + 1) * TILE_SIZE;
+        this.drawMaternityBed(g, bx, by);
+        this.interactionPoints.push({ x: bx, y: by, type: 'inspect' });
+        this.drawBassinet(g, bx + 36, by + 4);
+        bedCol += 5;
+      }
+      // Breast pump station on one side
+      this.drawBreastPumpStation(g, (c2 - 2) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c2 - 2) * TILE_SIZE, y: (r1 + 2) * TILE_SIZE, type: 'work' });
+      this.drawPottedPlant(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+    }
+
+    // ── EMERGENCY — crash carts, trauma stretchers, defibrillators
+    else if (tid === TILE_ID.EMERGENCY) {
+      // Trauma bays along top
+      let col = c1 + 1;
+      while (col < c2 - 1) {
+        this.drawTraumaStretcher(g, col * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+        this.interactionPoints.push({ x: col * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'inspect' });
+        this.drawCrashCart(g, col * TILE_SIZE + 36, (r1 + 1) * TILE_SIZE);
+        col += 5;
+      }
+      // Defibrillator on wall
+      this.drawDefibrillator(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 1) * TILE_SIZE, y: (r2 - 2) * TILE_SIZE, type: 'work' });
+      // Triage desk
+      this.drawOfficeDesk(g, midC * TILE_SIZE, midR * TILE_SIZE);
+      this.interactionPoints.push({ x: midC * TILE_SIZE, y: midR * TILE_SIZE, type: 'work' });
+    }
+
+    // ── PHARMACY — tall shelving units + dispensing counter
+    else if (tid === TILE_ID.PHARMACY) {
+      // Dispensing counter along top
+      for (let c = c1 + 1; c < c2 - 1; c += 2) {
+        this.drawLabCounter(g, c * TILE_SIZE, (r1 + 1) * TILE_SIZE, TILE_SIZE * 2 - 4);
+        this.interactionPoints.push({ x: c * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'work' });
+      }
+      // Shelving units (tall cabinets)
+      for (let c = c1 + 1; c < c2 - 1; c += 2) {
+        this.drawShelvingUnit(g, c * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      }
+      this.drawRefrigerator(g, (c2 - 2) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+    }
+
+    // ── LAB — benches with microscopes, centrifuges
+    else if (tid === TILE_ID.LAB) {
+      // Lab bench top
+      for (let c = c1 + 1; c < c2 - 1; c += 3) {
+        this.drawLabBench(g, c * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+        this.interactionPoints.push({ x: c * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'work' });
+      }
+      // Centrifuge + analyzer bottom row
+      this.drawCentrifuge(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.drawBioanalyzer(g, (c1 + 4) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 1) * TILE_SIZE, y: (r2 - 2) * TILE_SIZE, type: 'work' });
+      this.drawFilingCabinet(g, (c2 - 2) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+    }
+
+    // ── CME — autoclaves, sterilization counters
+    else if (tid === TILE_ID.CME) {
+      this.drawAutoclave(g, (c1 + 1) * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 1) * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'work' });
+      if (c2 - c1 > 4) {
+        this.drawAutoclave(g, (c1 + 4) * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+      }
+      for (let c = c1 + 1; c < c2 - 1; c += 2) {
+        this.drawLabCounter(g, c * TILE_SIZE, (r2 - 2) * TILE_SIZE, TILE_SIZE * 2 - 4);
+        this.interactionPoints.push({ x: c * TILE_SIZE, y: (r2 - 2) * TILE_SIZE, type: 'work' });
+      }
+      this.drawShelvingUnit(g, (c2 - 2) * TILE_SIZE, midR * TILE_SIZE);
+    }
+
+    // ── ADMIN/DIRETORIA — executive desks, filing cabinets, plants
+    else if (tid === TILE_ID.ADMIN) {
+      this.drawExecutiveDesk(g, midC * TILE_SIZE, midR * TILE_SIZE);
+      this.interactionPoints.push({ x: midC * TILE_SIZE, y: midR * TILE_SIZE, type: 'work' });
+      this.drawOfficeDesk(g, (c1 + 1) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 1) * TILE_SIZE, y: (r1 + 2) * TILE_SIZE, type: 'work' });
+      this.drawFilingCabinet(g, (c2 - 2) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.drawFilingCabinet(g, (c2 - 2) * TILE_SIZE, (r1 + 4) * TILE_SIZE);
+      this.drawPottedPlant(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.drawPottedPlant(g, (c2 - 2) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.drawWaitingChairs(g, midC * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: midC * TILE_SIZE, y: (r2 - 2) * TILE_SIZE, type: 'sit' });
+    }
+
+    // ── RECEPTION — reception counter, waiting area
+    else if (tid === TILE_ID.RECEPTION) {
+      this.drawReceptionCounter(g, (c1 + 1) * TILE_SIZE, (r1 + 1) * TILE_SIZE, c2 - c1 - 2);
+      this.interactionPoints.push({ x: midC * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'work' });
+      // Waiting chairs in rows
+      for (let c = c1 + 1; c < c2 - 1; c += 3) {
+        this.drawWaitingChairs(g, c * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+        this.interactionPoints.push({ x: c * TILE_SIZE, y: (r2 - 2) * TILE_SIZE, type: 'sit' });
+      }
+      this.drawPottedPlant(g, (c2 - 2) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.drawPottedPlant(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+    }
+
+    // ── BREAK/NUTRITION — dining tables, vending, kitchenette
+    else if (tid === TILE_ID.BREAK) {
+      this.drawDiningTable(g, (c1 + 1) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 1) * TILE_SIZE, y: (r1 + 2) * TILE_SIZE, type: 'rest' });
+      if (c2 - c1 > 5) {
+        this.drawDiningTable(g, (c1 + 4) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+        this.interactionPoints.push({ x: (c1 + 4) * TILE_SIZE, y: (r1 + 2) * TILE_SIZE, type: 'rest' });
+      }
+      this.drawVendingMachine(g, (c2 - 2) * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+      this.drawKitchenCounter(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE, c2 - c1 - 2);
+      this.drawPottedPlant(g, (c2 - 2) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+    }
+
+    // ── NURSING STATION — long counter, monitors, filing cabinets
+    else if (tid === TILE_ID.NURSING) {
+      this.drawNursingDesk(g, (c1 + 1) * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 1) * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'work' });
+      if (c2 - c1 > 4) {
+        this.drawNursingDesk(g, (c1 + 4) * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+        this.interactionPoints.push({ x: (c1 + 4) * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'work' });
+      }
+      // Filing cabinets along back wall
+      for (let c = c1 + 1; c < c2 - 1; c += 3) {
+        this.drawFilingCabinet(g, c * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      }
+      this.drawCrashCart(g, (c2 - 2) * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+    }
+
+    // ── RADIOLOGY — CT scanner + control room + cabinets
+    else if (tid === TILE_ID.RADIOLOGY) {
+      this.drawCTScanner(g, (c1 + 2) * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 2) * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'work' });
+      this.drawXRayViewer(g, (c2 - 3) * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c2 - 3) * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'work' });
+      this.drawOfficeDesk(g, midC * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: midC * TILE_SIZE, y: (r2 - 2) * TILE_SIZE, type: 'work' });
+      this.drawCabinet(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+    }
+
+    // ── ONCOLOGY — chemo chairs + IV poles
+    else if (tid === TILE_ID.ONCOLOGY) {
+      for (let c = c1 + 1; c < c2 - 1; c += 3) {
+        this.drawChemoChair(g, c * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+        this.interactionPoints.push({ x: c * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'inspect' });
+        this.drawIVPole(g, c * TILE_SIZE + 24, (r1 + 1) * TILE_SIZE - 4);
+        if (c + 3 < c2 - 1) {
+          this.drawChemoChair(g, (c + 1) * TILE_SIZE, (r2 - 3) * TILE_SIZE);
+          this.interactionPoints.push({ x: (c + 1) * TILE_SIZE, y: (r2 - 3) * TILE_SIZE, type: 'inspect' });
         }
       }
+      this.drawNursingDesk(g, midC * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: midC * TILE_SIZE, y: (r2 - 2) * TILE_SIZE, type: 'work' });
+    }
+
+    // ── REHAB — exercise equipment, parallel bars
+    else if (tid === TILE_ID.REHAB) {
+      this.drawParallelBars(g, (c1 + 1) * TILE_SIZE, midR * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 1) * TILE_SIZE, y: midR * TILE_SIZE, type: 'sit' });
+      this.drawExerciseMat(g, midC * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: midC * TILE_SIZE, y: (r1 + 2) * TILE_SIZE, type: 'inspect' });
+      this.drawOfficeDesk(g, (c2 - 2) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c2 - 2) * TILE_SIZE, y: (r1 + 2) * TILE_SIZE, type: 'work' });
+      this.drawPottedPlant(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+    }
+
+    // ── OUTPATIENT — exam tables, doctor desk
+    else if (tid === TILE_ID.OUTPATIENT) {
+      for (let c = c1 + 1; c < c2 - 1; c += 3) {
+        this.drawExamTable(g, c * TILE_SIZE, (r1 + 1) * TILE_SIZE);
+        this.interactionPoints.push({ x: c * TILE_SIZE, y: (r1 + 1) * TILE_SIZE, type: 'inspect' });
+      }
+      this.drawOfficeDesk(g, midC * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: midC * TILE_SIZE, y: (r2 - 2) * TILE_SIZE, type: 'work' });
+      this.drawPottedPlant(g, (c2 - 2) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.drawWaitingChairs(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 1) * TILE_SIZE, y: (r2 - 2) * TILE_SIZE, type: 'sit' });
+    }
+
+    // ── PSYCH — therapy sofas, plants, calm decor
+    else if (tid === TILE_ID.PSYCH) {
+      this.drawTherapySofa(g, (c1 + 1) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c1 + 1) * TILE_SIZE, y: (r1 + 2) * TILE_SIZE, type: 'sit' });
+      this.drawTherapySofa(g, midC * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: midC * TILE_SIZE, y: (r1 + 2) * TILE_SIZE, type: 'sit' });
+      this.drawOfficeDesk(g, (c2 - 2) * TILE_SIZE, (r1 + 2) * TILE_SIZE);
+      this.interactionPoints.push({ x: (c2 - 2) * TILE_SIZE, y: (r1 + 2) * TILE_SIZE, type: 'work' });
+      this.drawTherapyPlant(g, (c1 + 1) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.drawTherapyPlant(g, (c2 - 2) * TILE_SIZE, (r2 - 2) * TILE_SIZE);
+      this.drawPottedPlant(g, midC * TILE_SIZE, (r2 - 2) * TILE_SIZE);
     }
   }
 
@@ -543,6 +686,345 @@ export class GameScene extends Phaser.Scene {
      g.fillStyle(0x000000, 0.15); g.fillRect(bx + 2, by + 2, 28, 12);
      g.fillStyle(0xd35400, 1); g.fillRoundedRect(bx, by, 28, 10, 2);
      g.fillStyle(0xa04000, 1); g.fillRect(bx, by + 4, 28, 2);
+  }
+
+  // ─── NEW SPECIALISED PROPS ──────────────────────────────────────────────────
+
+  private drawVentilator(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 24, 28);
+    g.fillStyle(0x000000, 0.25); g.fillRoundedRect(bx + 2, by + 2, 24, 28, 4);
+    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx, by, 24, 28, 4);
+    // Screen
+    g.fillStyle(0x2c3e50, 1); g.fillRoundedRect(bx + 3, by + 3, 18, 10, 2);
+    g.fillStyle(0x00ff88, 0.6); g.fillRect(bx + 4, by + 4, 16, 8);
+    // Waveform line
+    g.lineStyle(1, 0x00ff88, 1);
+    g.beginPath(); g.moveTo(bx + 4, by + 8); g.lineTo(bx + 8, by + 8);
+    g.lineTo(bx + 9, by + 5); g.lineTo(bx + 10, by + 11); g.lineTo(bx + 11, by + 8);
+    g.lineTo(bx + 20, by + 8); g.strokePath();
+    // Dials
+    g.fillStyle(0x95a5a6, 1);
+    g.fillCircle(bx + 6, by + 19, 4);
+    g.fillCircle(bx + 18, by + 19, 4);
+    g.fillStyle(0x7f8c8d, 1);
+    g.fillCircle(bx + 6, by + 19, 2);
+    g.fillCircle(bx + 18, by + 19, 2);
+    // Tube outlet
+    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx + 10, by + 27, 4, 6);
+    g.fillStyle(0xecf0f1, 0.8); g.fillRoundedRect(bx + 8, by + 32, 8, 4, 2);
+  }
+
+  private drawIVPole(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    // Slim IV pole with bag
+    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx + 5, by - 2, 3, 36);
+    // Bag
+    g.fillStyle(0x000000, 0.2); g.fillRoundedRect(bx + 2, by - 14, 9, 14, 3);
+    g.fillStyle(0xd6eaf8, 0.9); g.fillRoundedRect(bx + 1, by - 15, 9, 14, 3);
+    g.fillStyle(0xaed6f1, 0.7); g.fillRect(bx + 3, by - 13, 5, 8);
+    // Base
+    g.fillStyle(0x95a5a6, 1); g.fillRect(bx + 1, by + 33, 11, 3);
+    g.fillCircle(bx + 6, by + 36, 4);
+  }
+
+  private drawMaternityBed(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx + 2, by + 2, 28, 44);
+    // Shadow
+    g.fillStyle(0x000000, 0.18); g.fillRoundedRect(bx + 5, by + 5, 26, 42, 4);
+    // Frame — soft pink/beige
+    g.fillStyle(0xf8c8d0, 1); g.fillRoundedRect(bx + 3, by + 2, 26, 44, 3);
+    // Mattress
+    g.fillStyle(0xfef9f0, 1); g.fillRoundedRect(bx + 5, by + 5, 22, 38, 2);
+    // Blanket — rose pink
+    g.fillStyle(0xf48fb1, 0.8); g.fillRoundedRect(bx + 5, by + 20, 22, 23, 2);
+    // Pillow
+    g.fillStyle(0xffffff, 1); g.fillRoundedRect(bx + 7, by + 7, 18, 10, 3);
+    // Patient head
+    g.fillStyle(0xf5c5a3, 1); g.beginPath(); g.arc(bx + 16, by + 12, 6, 0, Math.PI * 2); g.fill();
+    // Side rail (safety)
+    g.lineStyle(2, 0xf8bbd0, 1);
+    g.strokeRect(bx + 5, by + 5, 22, 38);
+    // IV hook on footboard
+    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx + 30, by + 2, 2, 20);
+  }
+
+  private drawBassinet(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 20, 22);
+    g.fillStyle(0x000000, 0.15); g.fillRoundedRect(bx + 2, by + 2, 20, 22, 5);
+    // Base — white with blue trim
+    g.fillStyle(0xffffff, 1); g.fillRoundedRect(bx, by, 20, 22, 5);
+    g.lineStyle(2, 0x90caf9, 1); g.strokeRoundedRect(bx, by, 20, 22, 5);
+    // Mattress
+    g.fillStyle(0xe3f2fd, 1); g.fillRoundedRect(bx + 2, by + 2, 16, 18, 3);
+    // Baby
+    g.fillStyle(0xfce4ec, 1); g.fillRoundedRect(bx + 5, by + 5, 10, 8, 3);
+    // Legs
+    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx + 3, by + 20, 3, 8);
+    g.fillRect(bx + 14, by + 20, 3, 8);
+  }
+
+  private drawBreastPumpStation(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 28, 20);
+    g.fillStyle(0x000000, 0.2); g.fillRoundedRect(bx + 2, by + 2, 28, 20, 3);
+    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx, by, 28, 20, 3);
+    // Device box
+    g.fillStyle(0xd0e8f5, 1); g.fillRoundedRect(bx + 4, by + 3, 12, 10, 2);
+    // Screen
+    g.fillStyle(0x2c3e50, 1); g.fillRoundedRect(bx + 5, by + 4, 8, 6, 1);
+    g.fillStyle(0x00ccff, 0.5); g.fillRect(bx + 6, by + 5, 6, 4);
+    // Tube coil
+    g.lineStyle(2, 0xaed6f1, 1);
+    g.beginPath(); g.arc(bx + 22, by + 10, 5, 0, Math.PI * 2); g.strokePath();
+    // Label
+    g.fillStyle(0x7f8c8d, 1); g.fillRect(bx + 4, by + 15, 20, 3);
+  }
+
+  private drawCrashCart(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 20, 28);
+    g.fillStyle(0x000000, 0.25); g.fillRoundedRect(bx + 2, by + 2, 20, 28, 3);
+    g.fillStyle(0xe74c3c, 1); g.fillRoundedRect(bx, by, 20, 28, 3);
+    // Drawers
+    g.fillStyle(0xc0392b, 1);
+    g.fillRect(bx + 2, by + 6, 16, 5);
+    g.fillRect(bx + 2, by + 13, 16, 5);
+    g.fillRect(bx + 2, by + 20, 16, 5);
+    // Drawer handles
+    g.fillStyle(0xecf0f1, 1);
+    g.fillRect(bx + 8, by + 8, 4, 2);
+    g.fillRect(bx + 8, by + 15, 4, 2);
+    g.fillRect(bx + 8, by + 22, 4, 2);
+    // Top tray
+    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx, by, 20, 4);
+    // Wheels
+    g.fillStyle(0x2c3e50, 1);
+    g.fillCircle(bx + 4, by + 28, 3);
+    g.fillCircle(bx + 16, by + 28, 3);
+    // Lock indicator
+    const locked = this.add.sprite(bx + 17, by + 2, 'red_led').setDepth(3).setOrigin(0.5);
+    this.tweens.add({ targets: locked, alpha: 0.15, duration: 900, yoyo: true, repeat: -1 });
+  }
+
+  private drawShelvingUnit(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 32, 24);
+    g.fillStyle(0x000000, 0.2); g.fillRect(bx + 2, by + 2, 32, 24);
+    g.fillStyle(0xd5d8dc, 1); g.fillRect(bx, by, 32, 24);
+    // Shelf dividers
+    g.fillStyle(0xaab7b8, 1);
+    g.fillRect(bx, by + 8, 32, 2);
+    g.fillRect(bx, by + 16, 32, 2);
+    // Items on shelves (coloured blocks = medicine boxes)
+    const colors = [0x3498db, 0xe74c3c, 0x2ecc71, 0xf39c12, 0x9b59b6];
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle(colors[i % colors.length], 0.9); g.fillRect(bx + 2 + i * 6, by + 2, 5, 5);
+    }
+    for (let i = 0; i < 4; i++) {
+      g.fillStyle(colors[(i + 2) % colors.length], 0.85); g.fillRect(bx + 2 + i * 7, by + 10, 6, 5);
+    }
+    for (let i = 0; i < 5; i++) {
+      g.fillStyle(colors[(i + 1) % colors.length], 0.9); g.fillRect(bx + 2 + i * 6, by + 18, 5, 5);
+    }
+  }
+
+  private drawRefrigerator(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 20, 28);
+    g.fillStyle(0x000000, 0.2); g.fillRoundedRect(bx + 2, by + 2, 20, 28, 3);
+    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx, by, 20, 28, 3);
+    // Blue tint = medicine fridge
+    g.fillStyle(0xd6eaf8, 0.5); g.fillRect(bx + 2, by + 2, 16, 24);
+    // Handle
+    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx + 16, by + 8, 3, 8);
+    // Temp readout
+    g.fillStyle(0x2c3e50, 1); g.fillRoundedRect(bx + 3, by + 18, 12, 6, 1);
+    g.fillStyle(0x00ff88, 0.8); g.fillRect(bx + 4, by + 19, 10, 4);
+    // Split line
+    g.lineStyle(1, 0xbdc3c7, 1); g.strokeRect(bx + 2, by + 13, 16, 1);
+  }
+
+  private drawLabBench(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, TILE_SIZE * 3 - 4, 18);
+    const w = TILE_SIZE * 3 - 4;
+    g.fillStyle(0x000000, 0.15); g.fillRect(bx + 2, by + 2, w, 18);
+    g.fillStyle(0xd5e8c8, 1); g.fillRect(bx, by, w, 14); // counter
+    g.fillStyle(0xaec6a3, 1); g.fillRect(bx, by + 14, w, 4); // edge
+    // Microscope
+    g.fillStyle(0x2c3e50, 1); g.fillRect(bx + 6, by + 2, 10, 10);
+    g.fillStyle(0x95a5a6, 1); g.fillCircle(bx + 11, by + 6, 3);
+    g.fillStyle(0x3498db, 0.6); g.fillCircle(bx + 11, by + 6, 2);
+    // Test tube rack
+    g.fillStyle(0xecf0f1, 1); g.fillRect(bx + 24, by + 4, 18, 7);
+    for (let i = 0; i < 4; i++) {
+      const tc = [0xe74c3c, 0xf39c12, 0x3498db, 0x2ecc71][i];
+      g.fillStyle(tc, 0.9); g.fillRoundedRect(bx + 26 + i * 4, by + 5, 3, 6, 1);
+    }
+    // Beaker
+    g.fillStyle(0xd6eaf8, 0.7); g.fillRoundedRect(bx + 50, by + 3, 8, 9, 2);
+    g.lineStyle(1, 0x85c1e9, 1); g.strokeRoundedRect(bx + 50, by + 3, 8, 9, 2);
+  }
+
+  private drawCentrifuge(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 24, 20);
+    g.fillStyle(0x000000, 0.2); g.fillRoundedRect(bx + 2, by + 2, 24, 20, 5);
+    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx, by, 24, 20, 5);
+    // Lid with circular rotor
+    g.fillStyle(0xbdc3c7, 1); g.fillCircle(bx + 12, by + 10, 8);
+    g.fillStyle(0x95a5a6, 1); g.fillCircle(bx + 12, by + 10, 5);
+    g.fillStyle(0x7f8c8d, 1); g.fillCircle(bx + 12, by + 10, 2);
+    // Spokes
+    g.lineStyle(1, 0x7f8c8d, 1);
+    for (let a = 0; a < 6; a++) {
+      const angle = (a / 6) * Math.PI * 2;
+      g.beginPath(); g.moveTo(bx + 12, by + 10);
+      g.lineTo(bx + 12 + Math.cos(angle) * 5, by + 10 + Math.sin(angle) * 5);
+      g.strokePath();
+    }
+    // Power button
+    g.fillStyle(0x2ecc71, 1); g.fillCircle(bx + 20, by + 3, 2);
+  }
+
+  private drawBioanalyzer(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 28, 20);
+    g.fillStyle(0x000000, 0.2); g.fillRoundedRect(bx + 2, by + 2, 28, 20, 3);
+    g.fillStyle(0xd6eaf8, 1); g.fillRoundedRect(bx, by, 28, 20, 3);
+    // Screen
+    g.fillStyle(0x2c3e50, 1); g.fillRoundedRect(bx + 3, by + 3, 14, 10, 2);
+    g.fillStyle(0x1abc9c, 0.6); g.fillRect(bx + 4, by + 4, 12, 8);
+    // Bar chart on screen
+    g.fillStyle(0x1abc9c, 1);
+    g.fillRect(bx + 5, by + 9, 2, 3);
+    g.fillRect(bx + 8, by + 7, 2, 5);
+    g.fillRect(bx + 11, by + 8, 2, 4);
+    g.fillRect(bx + 14, by + 6, 2, 6);
+    // Sample slot
+    g.fillStyle(0x7f8c8d, 1); g.fillRect(bx + 20, by + 6, 6, 6);
+    g.fillStyle(0xe74c3c, 0.7); g.fillRect(bx + 21, by + 7, 4, 4);
+  }
+
+  private drawAutoclave(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 30, 28);
+    g.fillStyle(0x000000, 0.25); g.fillRoundedRect(bx + 2, by + 2, 30, 28, 5);
+    g.fillStyle(0xecf0f1, 1); g.fillRoundedRect(bx, by, 30, 28, 5);
+    // Cylindrical door
+    g.fillStyle(0xbdc3c7, 1); g.fillCircle(bx + 15, by + 13, 10);
+    g.fillStyle(0x7f8c8d, 1); g.fillCircle(bx + 15, by + 13, 7);
+    g.fillStyle(0x95a5a6, 1); g.fillCircle(bx + 15, by + 13, 4);
+    // Handle
+    g.fillStyle(0x34495e, 1); g.fillRect(bx + 25, by + 10, 4, 6);
+    // Status panel
+    g.fillStyle(0x2c3e50, 1); g.fillRoundedRect(bx + 2, by + 23, 20, 4, 1);
+    g.fillStyle(0x2ecc71, 1); g.fillCircle(bx + 5, by + 25, 1);
+    g.fillStyle(0xf39c12, 1); g.fillCircle(bx + 10, by + 25, 1);
+    // Pressure gauge
+    g.fillStyle(0xecf0f1, 1); g.fillCircle(bx + 25, by + 22, 4);
+    g.lineStyle(1, 0x7f8c8d, 1); g.strokeCircle(bx + 25, by + 22, 4);
+    g.lineStyle(2, 0xe74c3c, 1);
+    g.beginPath(); g.moveTo(bx + 25, by + 22); g.lineTo(bx + 27, by + 20); g.strokePath();
+  }
+
+  private drawExecutiveDesk(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 48, 28);
+    g.fillStyle(0x000000, 0.2); g.fillRect(bx + 2, by + 2, 48, 28);
+    g.fillStyle(0x7d4f1e, 1); g.fillRoundedRect(bx, by, 48, 18, 4); // rich mahogany top
+    g.fillStyle(0x5d3a13, 1); g.fillRect(bx, by + 18, 48, 4); // edge
+    // Monitor
+    g.fillStyle(0x2c3e50, 1); g.fillRect(bx + 16, by + 2, 16, 10);
+    g.fillStyle(0x3498db, 0.8); g.fillRect(bx + 17, by + 3, 14, 8);
+    g.fillStyle(0x2c3e50, 1); g.fillRect(bx + 22, by + 13, 4, 3);
+    // Name plate
+    g.fillStyle(0xd4ac0d, 1); g.fillRect(bx + 4, by + 7, 10, 3);
+    // Pen holder
+    g.fillStyle(0x5d3a13, 1); g.fillRect(bx + 38, by + 3, 6, 8);
+    g.fillStyle(0x2c3e50, 1); g.fillRect(bx + 40, by + 1, 2, 3);
+    g.fillRect(bx + 42, by + 2, 2, 2);
+    // Chair
+    g.fillStyle(0x2c3e50, 1); g.fillRoundedRect(bx + 12, by + 22, 24, 12, 5);
+    g.fillStyle(0x1a252f, 1); g.fillRoundedRect(bx + 14, by + 24, 20, 8, 4);
+  }
+
+  private drawReceptionCounter(g: Phaser.GameObjects.Graphics, bx: number, by: number, widthTiles: number) {
+    const w = widthTiles * TILE_SIZE;
+    this.addPropCollision(bx, by, w, 20);
+    g.fillStyle(0x000000, 0.15); g.fillRect(bx + 2, by + 2, w, 20);
+    g.fillStyle(0xfdebd0, 1); g.fillRoundedRect(bx, by, w, 15, 4); // warm counter
+    g.fillStyle(0xe8c4a0, 1); g.fillRect(bx, by + 15, w, 4);
+    // Monitors
+    const numMonitors = Math.min(3, Math.floor(widthTiles / 3));
+    for (let i = 0; i < numMonitors; i++) {
+      const mx = bx + 10 + i * (w / numMonitors);
+      g.fillStyle(0x2c3e50, 1); g.fillRect(mx, by + 2, 14, 9);
+      g.fillStyle(0x27ae60, 0.7); g.fillRect(mx + 1, by + 3, 12, 7);
+    }
+    // Bell
+    g.fillStyle(0xf39c12, 1); g.fillCircle(bx + w - 14, by + 8, 5);
+    g.fillStyle(0xe67e22, 1); g.fillRect(bx + w - 17, by + 12, 6, 2);
+  }
+
+  private drawKitchenCounter(g: Phaser.GameObjects.Graphics, bx: number, by: number, widthTiles: number) {
+    const w = widthTiles * TILE_SIZE;
+    this.addPropCollision(bx, by, w, 16);
+    g.fillStyle(0x000000, 0.12); g.fillRect(bx + 2, by + 2, w, 16);
+    g.fillStyle(0x717d7e, 1); g.fillRect(bx, by, w, 12);
+    g.fillStyle(0x5d6d7e, 1); g.fillRect(bx, by + 12, w, 4);
+    // Sink
+    g.fillStyle(0x85c1e9, 0.5); g.fillRoundedRect(bx + 4, by + 2, 14, 8, 2);
+    g.lineStyle(1, 0x7fb3d3, 1); g.strokeRoundedRect(bx + 4, by + 2, 14, 8, 2);
+    g.fillStyle(0xbdc3c7, 1); g.fillRect(bx + 10, by + 1, 2, 3); // faucet
+    // Microwave
+    if (w > 48) {
+      g.fillStyle(0x2c3e50, 1); g.fillRoundedRect(bx + 24, by + 2, 18, 8, 2);
+      g.fillStyle(0x34495e, 1); g.fillRoundedRect(bx + 25, by + 3, 12, 6, 1);
+      g.fillStyle(0x1abc9c, 0.5); g.fillRect(bx + 26, by + 4, 10, 4);
+    }
+  }
+
+  private drawXRayViewer(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 32, 24);
+    g.fillStyle(0x000000, 0.2); g.fillRoundedRect(bx + 2, by + 2, 32, 24, 3);
+    g.fillStyle(0x1a252f, 1); g.fillRoundedRect(bx, by, 32, 24, 3);
+    // Light box
+    g.fillStyle(0xe8f8ff, 0.85); g.fillRoundedRect(bx + 2, by + 2, 28, 18, 2);
+    // X-ray silhouette
+    g.fillStyle(0xaed6f1, 0.4); g.fillRoundedRect(bx + 8, by + 4, 16, 14, 2);
+    // Ribcage lines
+    g.lineStyle(1, 0x2c3e50, 0.5);
+    for (let i = 0; i < 4; i++) {
+      g.beginPath(); g.moveTo(bx + 10, by + 5 + i * 3); g.lineTo(bx + 22, by + 5 + i * 3); g.strokePath();
+    }
+    // Controls
+    g.fillStyle(0x34495e, 1); g.fillRect(bx + 2, by + 20, 28, 3);
+    g.fillStyle(0x3498db, 0.8); g.fillCircle(bx + 6, by + 21, 2);
+    g.fillStyle(0xf39c12, 0.8); g.fillCircle(bx + 12, by + 21, 2);
+  }
+
+  private drawParallelBars(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 48, 32);
+    // Two rails
+    g.fillStyle(0x7f8c8d, 1);
+    g.fillRoundedRect(bx, by + 12, 48, 4, 2);
+    g.fillRoundedRect(bx, by + 24, 48, 4, 2);
+    // Vertical posts
+    g.fillStyle(0x95a5a6, 1);
+    g.fillRect(bx + 2, by + 12, 4, 16);
+    g.fillRect(bx + 20, by + 12, 4, 16);
+    g.fillRect(bx + 42, by + 12, 4, 16);
+    // Floor mats
+    g.fillStyle(0x27ae60, 0.6); g.fillRoundedRect(bx + 4, by + 28, 40, 6, 2);
+    // Height labels
+    g.fillStyle(0xaab7b8, 1); g.fillRect(bx, by + 6, 4, 6);
+    g.fillStyle(0xaab7b8, 1); g.fillRect(bx, by + 28, 4, 6);
+  }
+
+  private drawExerciseMat(g: Phaser.GameObjects.Graphics, bx: number, by: number) {
+    this.addPropCollision(bx, by, 40, 24);
+    g.fillStyle(0x000000, 0.15); g.fillRoundedRect(bx + 2, by + 2, 40, 24, 4);
+    g.fillStyle(0x27ae60, 0.85); g.fillRoundedRect(bx, by, 40, 24, 4);
+    // Stripes
+    g.lineStyle(2, 0x1e8449, 0.6);
+    for (let i = 4; i < 40; i += 8) {
+      g.beginPath(); g.moveTo(bx + i, by); g.lineTo(bx + i, by + 24); g.strokePath();
+    }
+    // Center cross
+    g.lineStyle(2, 0x1abc9c, 0.4);
+    g.beginPath(); g.moveTo(bx + 20, by); g.lineTo(bx + 20, by + 24); g.strokePath();
+    g.beginPath(); g.moveTo(bx, by + 12); g.lineTo(bx + 40, by + 12); g.strokePath();
   }
 
   // ─── LIGHTING OVERLAY ──────────────────────────────────────────────────────

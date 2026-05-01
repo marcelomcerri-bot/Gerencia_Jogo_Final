@@ -6,9 +6,8 @@ const SPR_W = 44;
 const SPR_H = 64;
 const FRAMES = 12;
 
-// ── Canvas helper: rounded rect (fill) ────────────────────────────────────────
 function rrFill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  if (w < 0 || h < 0) return;
+  if (w < 1 || h < 1) return;
   const rr = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
   ctx.moveTo(x + rr, y);
@@ -20,9 +19,8 @@ function rrFill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, 
   ctx.fill();
 }
 
-// ── Canvas helper: rounded rect (stroke) ──────────────────────────────────────
 function rrStroke(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
-  if (w < 0 || h < 0) return;
+  if (w < 1 || h < 1) return;
   const rr = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
   ctx.moveTo(x + rr, y);
@@ -32,6 +30,14 @@ function rrStroke(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
   ctx.arcTo(x, y, x + w, y, rr);
   ctx.closePath();
   ctx.stroke();
+}
+
+function darken(hex: string, amount = 0.2): string {
+  const n = parseInt(hex.replace('#', ''), 16);
+  const r = Math.max(0, ((n >> 16) & 0xff) * (1 - amount)) | 0;
+  const g = Math.max(0, ((n >> 8) & 0xff) * (1 - amount)) | 0;
+  const b = Math.max(0, (n & 0xff) * (1 - amount)) | 0;
+  return `rgb(${r},${g},${b})`;
 }
 
 export class BootScene extends Phaser.Scene {
@@ -53,7 +59,6 @@ export class BootScene extends Phaser.Scene {
     });
     void loadLabel;
 
-    // HUAP/UFF cover images
     const base = (import.meta as any).env?.BASE_URL || '/';
     this.load.image('huap_photo', `${base}assets/huap.png`);
     this.load.image('huap_pixelart', `${base}assets/huap_pixelart.png`);
@@ -70,21 +75,19 @@ export class BootScene extends Phaser.Scene {
     this.scene.start(SCENES.MENU);
   }
 
-  // ── Render the loaded HUAP photo as a true pixel-art mural ───────────────
   private createPixelizedHuap() {
     if (!this.textures.exists('huap_photo')) return;
     const img = this.textures.get('huap_photo').getSourceImage() as HTMLImageElement;
     if (!img || !img.width) return;
 
     const TARGET_W = 1280, TARGET_H = 720;
-    const PIX_W = 256, PIX_H = 144; // 5x downsample → chunky pixel grid
+    const PIX_W = 256, PIX_H = 144;
 
     const small = document.createElement('canvas');
     small.width = PIX_W; small.height = PIX_H;
     const sctx = small.getContext('2d')!;
     sctx.imageSmoothingEnabled = false;
 
-    // Cover-fit: crop to target aspect
     const sR = img.width / img.height;
     const dR = PIX_W / PIX_H;
     let sx = 0, sy = 0, sw = img.width, sh = img.height;
@@ -92,13 +95,12 @@ export class BootScene extends Phaser.Scene {
     else { sh = img.width / dR; sy = (img.height - sh) / 2; }
     sctx.drawImage(img, sx, sy, sw, sh, 0, 0, PIX_W, PIX_H);
 
-    // Quantize to a limited palette + pop saturation in midtones
     const data = sctx.getImageData(0, 0, PIX_W, PIX_H);
     const px = data.data;
     const LEVELS = 6;
     const step = 255 / (LEVELS - 1);
     for (let i = 0; i < px.length; i += 4) {
-      let r = Math.round(px[i]     / step) * step;
+      let r = Math.round(px[i] / step) * step;
       let g = Math.round(px[i + 1] / step) * step;
       let b = Math.round(px[i + 2] / step) * step;
       const lum = (r + g + b) / 3;
@@ -107,14 +109,11 @@ export class BootScene extends Phaser.Scene {
         g = Math.max(0, Math.min(255, g + Math.round((g - lum) * 0.30)));
         b = Math.max(0, Math.min(255, b + Math.round((b - lum) * 0.30)));
       }
-      // Subtle warm cast — gives the brutalist façade a sunlit feel
-      r = Math.min(255, r + 6);
-      g = Math.min(255, g + 2);
+      r = Math.min(255, r + 6); g = Math.min(255, g + 2);
       px[i] = r; px[i + 1] = g; px[i + 2] = b;
     }
     sctx.putImageData(data, 0, 0);
 
-    // Upscale with nearest-neighbour for crisp pixels
     if (this.textures.exists('huap_pixel')) this.textures.remove('huap_pixel');
     const big = this.textures.createCanvas('huap_pixel', TARGET_W, TARGET_H) as Phaser.Textures.CanvasTexture;
     const ctx = big.getContext();
@@ -123,9 +122,7 @@ export class BootScene extends Phaser.Scene {
     big.refresh();
   }
 
-  // ── LIGHT TEXTURES (For Lag-Free WebGL) ──────────────────────────────────
   private createLightTextures() {
-    // Soft radial glow (white to transparent)
     const glowD = 256;
     const ctGlow = this.textures.createCanvas('light_glow', glowD, glowD) as Phaser.Textures.CanvasTexture;
     const ctxG = ctGlow.getContext();
@@ -137,15 +134,13 @@ export class BootScene extends Phaser.Scene {
     ctxG.beginPath(); ctxG.arc(glowD / 2, glowD / 2, glowD / 2, 0, Math.PI * 2); ctxG.fill();
     ctGlow.refresh();
 
-    // Red LED for monitors
     const ctLed = this.textures.createCanvas('red_led', 4, 4) as Phaser.Textures.CanvasTexture;
     const ctxLed = ctLed.getContext();
-    ctxLed.fillStyle = '#ff0000'; ctxLed.fillRect(0, 0, 4, 4);
-    ctxLed.fillStyle = '#ffffff'; ctxLed.fillRect(1, 1, 2, 2);
+    ctxLed.fillStyle = '#ff2222'; ctxLed.fillRect(0, 0, 4, 4);
+    ctxLed.fillStyle = '#ff9999'; ctxLed.fillRect(1, 1, 2, 2);
     ctLed.refresh();
   }
 
-  // ── PLAYER SPRITE ─────────────────────────────────────────────────────────
   private createPlayerSprite() {
     const key = 'player';
     if (this.textures.exists(key)) this.textures.remove(key);
@@ -155,8 +150,9 @@ export class BootScene extends Phaser.Scene {
     for (let dir = 0; dir < 4; dir++) {
       for (let step = 0; step < 3; step++) {
         this.drawCharacter(ctx, dir * 3 + step, dir, step, {
-          skin: '#f5c5a3', coat: '#1abc9c', coatDark: '#16a085',
-          hair: '#2c1a12', shoe: '#2c3e50', role: 'nurse', isPlayer: true,
+          skin: '#f5c5a3', coat: '#1abc9c', coatDark: '#12876b',
+          pants: '#0e6b55', hair: '#2c1a12', shoe: '#1a0f08',
+          role: 'nurse', isPlayer: true,
         });
       }
     }
@@ -164,7 +160,6 @@ export class BootScene extends Phaser.Scene {
     for (let i = 0; i < FRAMES; i++) ct.add(i, 0, i * SPR_W, 0, SPR_W, SPR_H);
   }
 
-  // ── NPC SPRITES ───────────────────────────────────────────────────────────
   private createNPCSprites() {
     for (const def of NPC_DEFS) {
       const key = def.spriteKey;
@@ -172,22 +167,24 @@ export class BootScene extends Phaser.Scene {
       const ct = this.textures.createCanvas(key, SPR_W * FRAMES, SPR_H) as Phaser.Textures.CanvasTexture;
       const ctx = ct.getContext();
 
-      const hex = (n: number) => `rgb(${(n >> 16) & 0xff},${(n >> 8) & 0xff},${n & 0xff})`;
-      const darker = (n: number, p = 0.25) => {
+      const hexRgb = (n: number) => `rgb(${(n >> 16) & 0xff},${(n >> 8) & 0xff},${n & 0xff})`;
+      const hexDark = (n: number, p = 0.3) => {
         const r = Math.max(0, ((n >> 16) & 0xff) * (1 - p)) | 0;
         const g = Math.max(0, ((n >> 8) & 0xff) * (1 - p)) | 0;
         const b = Math.max(0, (n & 0xff) * (1 - p)) | 0;
         return `rgb(${r},${g},${b})`;
       };
+      const pantsDark = (n: number) => hexDark(n, 0.45);
 
       for (let dir = 0; dir < 4; dir++) {
         for (let step = 0; step < 3; step++) {
           this.drawCharacter(ctx, dir * 3 + step, dir, step, {
-            skin: def.skinColor ? hex(def.skinColor) : '#f5c5a3',
-            coat: hex(def.coatColor),
-            coatDark: darker(def.coatColor),
-            hair: hex(def.hairColor),
-            shoe: '#11151a',
+            skin: def.skinColor ? hexRgb(def.skinColor) : '#f5c5a3',
+            coat: hexRgb(def.coatColor),
+            coatDark: hexDark(def.coatColor),
+            pants: pantsDark(def.coatColor),
+            hair: hexRgb(def.hairColor),
+            shoe: '#1a1008',
             role: def.role,
             isPlayer: false,
           });
@@ -198,11 +195,11 @@ export class BootScene extends Phaser.Scene {
     }
   }
 
-  // ── SHARED CHARACTER DRAWING ───────────────────────────────────────────────
+  // ── COMPLETE CHARACTER DRAWING SYSTEM ─────────────────────────────────────
   private drawCharacter(
     ctx: CanvasRenderingContext2D,
     fi: number, dir: number, step: number,
-    c: { skin: string; coat: string; coatDark: string; hair: string; shoe: string; role: string; isPlayer: boolean },
+    c: { skin: string; coat: string; coatDark: string; pants: string; hair: string; shoe: string; role: string; isPlayer: boolean },
   ) {
     const x = fi * SPR_W;
     ctx.clearRect(x, 0, SPR_W, SPR_H);
@@ -213,225 +210,381 @@ export class BootScene extends Phaser.Scene {
     const moving = step > 0;
     const facing = isRight ? 1 : -1;
 
-    // Enhanced animation amplitude
-    const legA = moving ? (step === 1 ? 5 : -5) : 0;
-    const legB = -legA;
-    const armA = moving ? (step === 1 ? 4 : -4) : 0;
-    const bob = moving ? (step === 1 ? -1.5 : 1.5) : 0;
+    // Walk cycle parameters — improved amplitude and natural gait
+    const stride = moving ? (step === 1 ? 8 : -8) : 0;    // leg stride
+    const strideB = -stride;                                 // opposite leg
+    const armSwing = moving ? (step === 1 ? 7 : -7) : 0;  // arm counter-swing
+    const armSwingB = -armSwing;
+    const bob = moving ? (step === 1 ? -2 : 1) : 0;       // vertical bob
+    const tilt = moving && isLR ? (step === 1 ? 0.5 : -0.5) : 0; // subtle torso tilt
     const cx = x + SPR_W / 2;
 
-    // Body Y-offset for taller sprites
-    const oy = 12;
+    // Character anchor point (feet at row ~58)
+    const groundY = 54;
+    const bodyBase = groundY + bob; // feet baseline
 
-    // Shadow
-    ctx.globalAlpha = 0.2;
+    // ── SHADOW ──────────────────────────────────────────────────────────────
+    ctx.globalAlpha = 0.22;
     ctx.fillStyle = '#000';
-    ctx.beginPath(); ctx.ellipse(cx, 48 + oy, 13, 4, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx + (isLR ? facing * stride * 0.1 : 0), groundY + 2, 11, 3.5, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.globalAlpha = 1;
 
-    // Shoes
+    // ── FEET / SHOES ─────────────────────────────────────────────────────────
     ctx.fillStyle = c.shoe;
     if (isLR) {
-      rrFill(ctx, cx - 3 + facing * legA, 44 + bob + oy, 12, 6, 2.5);
-      rrFill(ctx, cx - 11 - facing * legA, 44 + bob + oy, 12, 6, 2.5);
+      // Front foot
+      const ffx = cx - 2 + facing * (stride * 0.7);
+      const bfx = cx - 2 - facing * (stride * 0.5);
+      // Back foot (slightly lighter for depth)
+      ctx.globalAlpha = 0.7;
+      rrFill(ctx, bfx - 5, bodyBase - 4, 12, 5, 2);
+      ctx.globalAlpha = 1;
+      rrFill(ctx, ffx - 4, bodyBase - 4, 13, 5, 2);
+      // Toe highlight
+      ctx.fillStyle = darken(c.shoe, -0.4);
+      ctx.fillRect(ffx + 8, bodyBase - 3, 2, 2);
     } else {
-      rrFill(ctx, cx - 11, 45 + bob + oy, 9, 6, 2.5);
-      rrFill(ctx, cx + 2, 45 + bob + oy, 9, 6, 2.5);
+      // Down/Up view: two feet side by side with stride
+      const leftFoot = bodyBase + (moving ? stride * 0.5 : 0);
+      const rightFoot = bodyBase + (moving ? strideB * 0.5 : 0);
+      rrFill(ctx, cx - 12, leftFoot - 4, 10, 5, 2);
+      rrFill(ctx, cx + 2, rightFoot - 4, 10, 5, 2);
     }
 
-    // Legs / Pants
-    ctx.fillStyle = c.coatDark; // Use darker tone for trousers/scrubs
+    // ── LEGS / PANTS ──────────────────────────────────────────────────────────
     if (isLR) {
-      rrFill(ctx, cx - 6 + facing * legA, 26 + bob + oy, 8, 20, 2);
-      rrFill(ctx, cx + 1 - facing * legA, 26 + bob + oy, 8, 20, 2);
+      // Back leg (drawn first = behind)
+      ctx.fillStyle = darken(c.pants, 0.2);
+      const bLegX = cx - 4 - facing * (stride * 0.45);
+      rrFill(ctx, bLegX, bodyBase - 23, 7, 20, 3);
+      // Front leg
+      ctx.fillStyle = c.pants;
+      const fLegX = cx - 3 + facing * (stride * 0.55);
+      rrFill(ctx, fLegX, bodyBase - 23, 8, 20, 3);
+      // Knee highlight on front leg
+      ctx.fillStyle = darken(c.pants, -0.15);
+      ctx.fillRect(fLegX + 1, bodyBase - 18, 4, 3);
     } else {
-      rrFill(ctx, cx - 10, 26 + bob + legA + oy, 8, 20, 2);
-      rrFill(ctx, cx + 2, 26 + bob + legB + oy, 8, 20, 2);
+      // Front view: two legs
+      ctx.fillStyle = c.pants;
+      const leftLegY = bodyBase - 22 + (moving ? stride * 0.5 : 0);
+      const rightLegY = bodyBase - 22 + (moving ? strideB * 0.5 : 0);
+      rrFill(ctx, cx - 12, leftLegY, 9, 22, 3);
+      rrFill(ctx, cx + 3, rightLegY, 9, 22, 3);
+      // Leg shading
+      ctx.fillStyle = darken(c.pants, 0.2);
+      ctx.fillRect(cx - 3, leftLegY + 14, 2, 8);
+      ctx.fillRect(cx + 10, rightLegY + 14, 2, 8);
     }
 
-    // Torso / Scrub Top
+    // ── TORSO / UNIFORM TOP ───────────────────────────────────────────────────
+    const torsoY = bodyBase - 44 + bob * 0.4;
+    const torsoW = isLR ? 20 : 23;
+    const torsoH = 22;
+    const torsoX = cx - torsoW / 2;
+
+    // Save/restore for tilt
+    if (tilt !== 0 && isLR) {
+      ctx.save();
+      ctx.translate(cx, torsoY + torsoH / 2);
+      ctx.rotate(tilt * 0.06);
+      ctx.translate(-cx, -(torsoY + torsoH / 2));
+    }
+
+    // Torso shadow/depth
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(torsoX + 2, torsoY + 2, torsoW, torsoH);
+
+    // Main torso
     ctx.fillStyle = c.coat;
-    rrFill(ctx, cx - 12, 11 + bob + oy, 24, 18, 4);
-    // Torso Shading (bottom edge)
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    ctx.fillRect(cx - 12, 26 + bob + oy, 24, 3);
+    rrFill(ctx, torsoX, torsoY, torsoW, torsoH, 4);
+
+    // Torso shading — sides and bottom
+    ctx.fillStyle = c.coatDark;
+    if (isLR) {
+      // Side shading (back side darker)
+      const shadeSide = facing > 0 ? torsoX : torsoX + torsoW - 4;
+      rrFill(ctx, shadeSide, torsoY, 4, torsoH, 2);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.fillRect(torsoX, torsoY + torsoH - 4, torsoW, 4);
 
     // V-neck underlay
     if (!isUp) {
-      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillStyle = 'rgba(255,255,255,0.65)';
       ctx.beginPath();
-      ctx.moveTo(cx - 4, 11 + bob + oy); ctx.lineTo(cx + 4, 11 + bob + oy);
-      ctx.lineTo(cx, 19 + bob + oy); ctx.closePath(); ctx.fill();
+      if (isLR) {
+        const vx = facing > 0 ? torsoX + 4 : torsoX + torsoW - 8;
+        ctx.moveTo(vx, torsoY + 1);
+        ctx.lineTo(vx + 4, torsoY + 1);
+        ctx.lineTo(vx + 2, torsoY + 8);
+        ctx.closePath();
+      } else {
+        ctx.moveTo(cx - 3, torsoY + 1);
+        ctx.lineTo(cx + 3, torsoY + 1);
+        ctx.lineTo(cx, torsoY + 9);
+        ctx.closePath();
+      }
+      ctx.fill();
     }
 
-    // Doctor white lapels / Coat
+    // Doctor white coat
     if (c.role === 'doctor') {
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      if (!isUp) {
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      if (isLR) {
+        rrFill(ctx, facing > 0 ? torsoX - 2 : torsoX + torsoW - 3, torsoY, 5, torsoH + 2, 2);
+      } else if (!isUp) {
+        rrFill(ctx, torsoX - 2, torsoY, 5, torsoH + 2, 2);
+        rrFill(ctx, torsoX + torsoW - 3, torsoY, 5, torsoH + 2, 2);
+        // Lapels
         ctx.beginPath();
-        ctx.moveTo(cx - 4, 11 + bob + oy); ctx.lineTo(cx - 12, 21 + bob + oy); 
-        ctx.lineTo(cx - 12, 11 + bob + oy); ctx.closePath(); ctx.fill();
+        ctx.moveTo(cx - 2, torsoY + 1); ctx.lineTo(cx - 10, torsoY + 10);
+        ctx.lineTo(cx - 10, torsoY + 1); ctx.closePath(); ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(cx + 4, 11 + bob + oy); ctx.lineTo(cx + 12, 21 + bob + oy); 
-        ctx.lineTo(cx + 12, 11 + bob + oy); ctx.closePath(); ctx.fill();
-      }
-      // White coat extending down
-      rrFill(ctx, cx - 13, 11 + bob + oy, 5, 26, 2);
-      rrFill(ctx, cx + 8, 11 + bob + oy, 5, 26, 2);
-      if (isUp || isLR) {
-        ctx.fillRect(cx - 12, 11 + bob + oy, 24, 26);
+        ctx.moveTo(cx + 2, torsoY + 1); ctx.lineTo(cx + 10, torsoY + 10);
+        ctx.lineTo(cx + 10, torsoY + 1); ctx.closePath(); ctx.fill();
       }
     }
 
-    // Badge
-    if (!isUp && (c.role === 'nurse' || c.role === 'admin' || c.role === 'receptionist' || c.isPlayer)) {
-      ctx.fillStyle = '#e74c3c';
-      rrFill(ctx, cx - 9, 16 + bob + oy, 5, 7, 1.5);
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(cx - 8, 17 + bob + oy, 3, 3);
+    // Pocket detail
+    if (!isUp) {
+      ctx.fillStyle = darken(c.coat, 0.1);
+      if (isLR) {
+        const px2 = facing > 0 ? torsoX + torsoW - 7 : torsoX + 1;
+        rrFill(ctx, px2, torsoY + 12, 5, 4, 1);
+      } else {
+        rrFill(ctx, cx + 3, torsoY + 12, 5, 4, 1);
+      }
     }
 
     // Stethoscope
     if (!isUp && (c.role === 'nurse' || c.role === 'doctor' || c.isPlayer)) {
-      ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 1.8;
-      ctx.beginPath(); ctx.arc(cx, 19 + bob + oy, 5, 0, Math.PI); ctx.stroke();
-      ctx.fillStyle = '#2c3e50';
-      ctx.beginPath(); ctx.arc(cx + 5, 24 + bob + oy, 2, 0, Math.PI*2); ctx.fill();
+      ctx.strokeStyle = '#1a252f'; ctx.lineWidth = 1.8;
+      if (isLR) {
+        const stX = facing > 0 ? cx - 3 : cx - 2;
+        ctx.beginPath(); ctx.arc(stX, torsoY + 8, 4, 0, Math.PI); ctx.stroke();
+        ctx.fillStyle = '#1a252f';
+        ctx.beginPath(); ctx.arc(stX + 4 * facing, torsoY + 12, 2.5, 0, Math.PI * 2); ctx.fill();
+      } else {
+        ctx.beginPath(); ctx.arc(cx, torsoY + 8, 5, 0, Math.PI); ctx.stroke();
+        ctx.fillStyle = '#1a252f';
+        ctx.beginPath(); ctx.arc(cx + 5, torsoY + 13, 2.5, 0, Math.PI * 2); ctx.fill();
+      }
     }
 
-    // Arms
-    ctx.fillStyle = (c.role === 'doctor') ? '#ffffff' : c.coat;
-    if (isLR) {
-      rrFill(ctx, cx - 16, 13 + bob + armA + oy, 8, 16, 4);
-      rrFill(ctx, cx + 9, 13 + bob - armA + oy, 8, 16, 4);
-      // Shading
-      ctx.fillStyle = 'rgba(0,0,0,0.1)';
-      ctx.fillRect(cx - 16, 26 + bob + armA + oy, 8, 3);
-      ctx.fillRect(cx + 9, 26 + bob - armA + oy, 8, 3);
-    } else {
-      rrFill(ctx, cx - 16, 13 + bob + armA + oy, 7, 16, 3.5);
-      rrFill(ctx, cx + 9, 13 + bob - armA + oy, 7, 16, 3.5);
-      ctx.fillStyle = 'rgba(0,0,0,0.1)';
-      ctx.fillRect(cx - 16, 26 + bob + armA + oy, 7, 3);
-      ctx.fillRect(cx + 9, 26 + bob - armA + oy, 7, 3);
+    // ID Badge
+    if (!isUp && (c.role === 'nurse' || c.role === 'admin' || c.role === 'receptionist' || c.isPlayer)) {
+      const bdgX = isLR ? (facing > 0 ? cx - 10 : cx + 4) : cx - 11;
+      ctx.fillStyle = '#e74c3c';
+      rrFill(ctx, bdgX, torsoY + 5, 6, 8, 1);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(bdgX + 1, torsoY + 7, 4, 1);
+      ctx.fillRect(bdgX + 1, torsoY + 9, 3, 1);
+      ctx.fillRect(bdgX + 1, torsoY + 11, 4, 1);
     }
 
     // Clipboard (admin)
     if (c.role === 'admin' && !isUp) {
-      const clipX = isRight ? cx + 13 : isLeft ? cx - 18 : cx + 11;
-      ctx.fillStyle = '#f1c40f';
-      rrFill(ctx, clipX, 15 + bob + oy, 8, 11, 1);
+      const clipX = isRight ? cx + torsoW / 2 + 1 : isLeft ? cx - torsoW / 2 - 9 : cx + 10;
+      const clipY = torsoY + 4;
+      ctx.fillStyle = '#e8c97a';
+      rrFill(ctx, clipX, clipY, 9, 13, 1);
+      ctx.fillStyle = '#5d4037';
+      ctx.fillRect(clipX + 2, clipY + 2, 5, 1);
+      ctx.fillRect(clipX + 2, clipY + 5, 5, 1);
+      ctx.fillRect(clipX + 2, clipY + 8, 4, 1);
       ctx.fillStyle = '#2c3e50';
-      ctx.fillRect(clipX + 1, 18 + bob + oy, 6, 1);
-      ctx.fillRect(clipX + 1, 21 + bob + oy, 6, 1);
-      ctx.fillRect(clipX + 1, 24 + bob + oy, 6, 1);
+      rrFill(ctx, clipX + 3, clipY - 1, 3, 3, 1);
     }
 
-    // Hands
+    if (tilt !== 0 && isLR) ctx.restore();
+
+    // ── ARMS ──────────────────────────────────────────────────────────────────
+    const armY = torsoY + 2;
+    const armH = 18;
+
+    if (isLR) {
+      // Back arm
+      const backArmX = facing > 0 ? torsoX - 5 : torsoX + torsoW - 1;
+      ctx.fillStyle = darken(c.role === 'doctor' ? '#ffffff' : c.coat, 0.25);
+      rrFill(ctx, backArmX, armY + armSwingB, 7, armH, 3);
+      // Front arm
+      const frontArmX = facing > 0 ? torsoX + torsoW - 2 : torsoX - 6;
+      ctx.fillStyle = c.role === 'doctor' ? '#f0f0f0' : c.coat;
+      rrFill(ctx, frontArmX, armY + armSwing, 7, armH, 3);
+    } else {
+      ctx.fillStyle = c.role === 'doctor' ? '#f0f0f0' : c.coat;
+      rrFill(ctx, cx - 16, armY + armSwing, 7, armH, 3);
+      rrFill(ctx, cx + 9, armY + armSwingB, 7, armH, 3);
+      // Arm shading
+      ctx.fillStyle = 'rgba(0,0,0,0.1)';
+      ctx.fillRect(cx - 16, armY + armH - 3 + armSwing, 7, 3);
+      ctx.fillRect(cx + 9, armY + armH - 3 + armSwingB, 7, 3);
+    }
+
+    // ── HANDS ─────────────────────────────────────────────────────────────────
     ctx.fillStyle = c.skin;
     if (isLR) {
-      ctx.beginPath(); ctx.arc(cx - 12, 30 + bob + armA + oy, 4.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(cx + 13, 30 + bob - armA + oy, 4.5, 0, Math.PI * 2); ctx.fill();
+      const fhY = armY + armH + armSwing - 1;
+      const bhY = armY + armH + armSwingB - 1;
+      const fhX = facing > 0 ? torsoX + torsoW - 1 : torsoX - 4;
+      const bhX = facing > 0 ? torsoX - 3 : torsoX + torsoW - 3;
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath(); ctx.arc(bhX + 3.5, bhY + 4, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.beginPath(); ctx.arc(fhX + 3.5, fhY + 4, 4.5, 0, Math.PI * 2); ctx.fill();
     } else {
-      ctx.beginPath(); ctx.arc(cx - 12.5, 30 + bob + oy, 4.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(cx + 12.5, 30 + bob + oy, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx - 12, armY + armH + armSwing + 3, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + 13, armY + armH + armSwingB + 3, 4.5, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Neck
+    // ── NECK ─────────────────────────────────────────────────────────────────
+    const neckY = torsoY - 7;
     ctx.fillStyle = c.skin;
-    ctx.fillRect(cx - 4, 6 + bob + oy, 8, 7);
-    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    ctx.fillRect(cx - 4, 10 + bob + oy, 8, 3);
+    if (isLR) {
+      rrFill(ctx, cx - 3, neckY, 7, 9, 2);
+    } else {
+      rrFill(ctx, cx - 4, neckY, 8, 9, 2);
+    }
+    // Neck shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    ctx.fillRect(isLR ? cx - 3 : cx - 4, neckY + 5, isLR ? 7 : 8, 3);
 
-    // Head
+    // ── HEAD ──────────────────────────────────────────────────────────────────
+    const headCX = cx + (isLR ? facing * 1.5 : 0);
+    const headCY = torsoY - 13 + bob * 0.3;
+    const headRX = isLR ? 9 : 11;
+    const headRY = isLR ? 11 : 12;
+
+    // Head shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.12)';
+    ctx.beginPath(); ctx.ellipse(headCX + 2, headCY + 2, headRX, headRY, 0, 0, Math.PI * 2); ctx.fill();
+
+    // Head base
     ctx.fillStyle = c.skin;
-    ctx.beginPath(); ctx.ellipse(cx, bob + oy, 11, 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(headCX, headCY, headRX, headRY, 0, 0, Math.PI * 2); ctx.fill();
 
-    // Head shading
-    ctx.fillStyle = 'rgba(0,0,0,0.08)';
-    ctx.beginPath(); ctx.ellipse(cx + 7, 1 + bob + oy, 4, 9, 0.3, 0, Math.PI * 2); ctx.fill();
+    // Head highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+    ctx.beginPath(); ctx.ellipse(headCX - headRX * 0.3, headCY - headRY * 0.3, headRX * 0.5, headRY * 0.4, 0, 0, Math.PI * 2); ctx.fill();
 
-    // Hair
-    ctx.fillStyle = c.hair;
-    const isBald = (c.role === 'admin' && c.skin === '#8d5524');
-    const hasBeard = (c.role === 'doctor' && c.skin === '#e0ac69');
-    
+    // ── HAIR ──────────────────────────────────────────────────────────────────
+    const isBald = false;
     if (!isBald) {
+      ctx.fillStyle = c.hair;
       if (isDown) {
-        ctx.beginPath(); ctx.ellipse(cx, -1 + bob + oy, 11, 6, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillRect(cx - 11, -1 + bob + oy, 22, 6);
+        ctx.beginPath(); ctx.ellipse(headCX, headCY - 6, headRX, 7, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(headCX - headRX, headCY - 6, headRX * 2, 7);
         if (c.role === 'nurse' || c.isPlayer) {
-          ctx.beginPath(); ctx.arc(cx, -6 + bob + oy, 6, 0, Math.PI * 2); ctx.fill(); // neat bun
+          // Bun
+          ctx.beginPath(); ctx.arc(headCX, headCY - 14, 5, 0, Math.PI * 2); ctx.fill();
         } else if (c.role === 'receptionist') {
-          ctx.fillRect(cx - 11.5, 4 + bob + oy, 7, 10);
-          ctx.fillRect(cx + 4.5, 4 + bob + oy, 7, 10);
+          // Long hair
+          ctx.fillRect(headCX - headRX - 1, headCY, 7, 11);
+          ctx.fillRect(headCX + headRX - 5, headCY, 7, 11);
         }
       } else if (isUp) {
-        ctx.beginPath(); ctx.ellipse(cx, -1 + bob + oy, 11, 7, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillRect(cx - 11, -1 + bob + oy, 22, 13);
-        if (c.role === 'receptionist') {
-          ctx.fillRect(cx - 12, 6 + bob + oy, 24, 12);
+        ctx.beginPath(); ctx.ellipse(headCX, headCY - 5, headRX + 1, 8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(headCX - headRX - 1, headCY - 5, (headRX + 1) * 2, 14);
+        if (c.role === 'nurse' || c.isPlayer) {
+          ctx.beginPath(); ctx.arc(headCX, headCY - 15, 5, 0, Math.PI * 2); ctx.fill();
         }
       } else {
-        const hdir = facing > 0 ? -1 : 1;
-        ctx.beginPath(); ctx.ellipse(cx + hdir * 2, bob + oy, 11, 9, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillRect(cx - 11, bob + oy, 22, 9);
-        if (c.role === 'receptionist') {
-           ctx.fillRect(cx - hdir * 2 - 6, 4 + bob + oy, 12, 11);
+        // Side profile hair
+        const hdir = facing;
+        ctx.beginPath(); ctx.ellipse(headCX - hdir * 2, headCY - 5, headRX + 2, 8, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillRect(headCX - headRX - 1, headCY - 5, (headRX + 2) * 2, 10);
+        if (c.role === 'nurse' || c.isPlayer) {
+          ctx.beginPath(); ctx.arc(headCX - hdir * 2, headCY - 13, 5, 0, Math.PI * 2); ctx.fill();
         }
+        // Sideburn/ear area
+        ctx.fillRect(headCX + hdir * (headRX - 3), headCY, 4, 8);
       }
     }
 
-    // Face features
-    if (!isUp) {
-      ctx.fillStyle = '#2c3e50';
-      if (isDown) {
-        // Eyes
-        ctx.fillRect(cx - 5.5, 4 + bob + oy, 3.5, 3.5); ctx.fillRect(cx + 2, 4 + bob + oy, 3.5, 3.5);
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(cx - 5.5, 4 + bob + oy, 1.5, 1.5); ctx.fillRect(cx + 2, 4 + bob + oy, 1.5, 1.5);
-        ctx.fillStyle = '#c47a5a';
-        ctx.fillRect(cx - 2, 9 + bob + oy, 4, 2); // nose
-        ctx.fillStyle = 'rgba(210,80,80,0.25)';
-        ctx.beginPath(); ctx.arc(cx - 7.5, 9 + bob + oy, 2.5, 0, Math.PI*2); ctx.fill(); // blush L
-        ctx.beginPath(); ctx.arc(cx + 7.5, 9 + bob + oy, 2.5, 0, Math.PI*2); ctx.fill(); // blush R
-      } else if (isLeft) {
-        ctx.fillRect(cx - 7, 5 + bob + oy, 3.5, 3.5);
-        ctx.fillStyle = '#fff'; ctx.fillRect(cx - 7, 5 + bob + oy, 1.5, 1.5);
-        ctx.fillStyle = '#c47a5a'; ctx.fillRect(cx - 9, 9 + bob + oy, 3.5, 2); // nose profile
-      } else {
-        ctx.fillRect(cx + 3.5, 5 + bob + oy, 3.5, 3.5);
-        ctx.fillStyle = '#fff'; ctx.fillRect(cx + 3.5, 5 + bob + oy, 1.5, 1.5);
-        ctx.fillStyle = '#c47a5a'; ctx.fillRect(cx + 5.5, 9 + bob + oy, 3.5, 2); // nose profile
-      }
-    }
-
-    // Beard
-    if (hasBeard && !isUp) {
-       ctx.fillStyle = c.hair;
-       if (isDown) {
-          ctx.beginPath(); ctx.arc(cx, 12 + bob + oy, 5, 0, Math.PI); ctx.fill();
-          ctx.fillRect(cx - 5, 10 + bob + oy, 10, 4);
-       } else {
-          const fx = isLeft ? cx - 7 : cx + 3;
-          ctx.fillRect(fx, 10 + bob + oy, 4, 6);
-       }
-    }
-
-    // Glasses (doctor or admin)
-    if ((c.role === 'doctor' || c.role === 'admin') && isDown && !isBald) {
-      ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 1.5;
-      rrStroke(ctx, cx - 8, 3 + bob + oy, 6, 5, 2);
-      rrStroke(ctx, cx + 2, 3 + bob + oy, 6, 5, 2);
-      ctx.beginPath(); ctx.moveTo(cx - 2, 5 + bob + oy); ctx.lineTo(cx + 2, 5 + bob + oy); ctx.stroke();
-    }
-
-    // Nurse cap 
+    // ── NURSE CAP / HAT ───────────────────────────────────────────────────────
     if ((c.role === 'nurse' || c.isPlayer) && !isUp) {
       ctx.fillStyle = '#ffffff';
-      rrFill(ctx, cx - 8, -4 + bob + oy, 16, 5, 1);
+      rrFill(ctx, headCX - 9, headCY - 18, 18, 6, 1);
       ctx.fillStyle = '#e74c3c';
-      ctx.fillRect(cx - 8, -2 + bob + oy, 16, 2.5);
+      ctx.fillRect(headCX - 9, headCY - 15, 18, 2.5);
+    }
+
+    // ── FACE FEATURES ────────────────────────────────────────────────────────
+    if (!isUp) {
+      const eyeY = headCY - 1;
+      const noseY = headCY + 4;
+      const mouthY = headCY + 8;
+
+      if (isDown) {
+        // Eyes
+        ctx.fillStyle = '#1a2530';
+        ctx.fillRect(headCX - 5.5, eyeY - 1, 4, 4);
+        ctx.fillRect(headCX + 1.5, eyeY - 1, 4, 4);
+        // Eye whites
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(headCX - 5.5, eyeY - 1, 2, 2);
+        ctx.fillRect(headCX + 1.5, eyeY - 1, 2, 2);
+        // Pupils
+        ctx.fillStyle = '#000';
+        ctx.fillRect(headCX - 4, eyeY, 2, 2);
+        ctx.fillRect(headCX + 3, eyeY, 2, 2);
+        // Eyebrows
+        ctx.fillStyle = c.hair;
+        ctx.fillRect(headCX - 6, eyeY - 3, 5, 1.5);
+        ctx.fillRect(headCX + 1, eyeY - 3, 5, 1.5);
+        // Nose
+        ctx.fillStyle = darken(c.skin, 0.18);
+        ctx.beginPath(); ctx.arc(headCX, noseY, 1.5, 0, Math.PI * 2); ctx.fill();
+        // Blush
+        ctx.fillStyle = 'rgba(220,100,100,0.22)';
+        ctx.beginPath(); ctx.arc(headCX - 6.5, eyeY + 3, 2.5, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(headCX + 6.5, eyeY + 3, 2.5, 0, Math.PI * 2); ctx.fill();
+        // Smile
+        ctx.strokeStyle = darken(c.skin, 0.25); ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(headCX, mouthY, 3.5, 0.1, Math.PI - 0.1); ctx.stroke();
+      } else if (isLeft) {
+        // Profile: left side
+        ctx.fillStyle = '#1a2530';
+        ctx.fillRect(headCX - 7, eyeY - 1, 3.5, 3.5);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(headCX - 7, eyeY - 1, 1.5, 1.5);
+        ctx.fillStyle = c.hair;
+        ctx.fillRect(headCX - 8, eyeY - 4, 5, 1.5);
+        // Nose profile
+        ctx.fillStyle = darken(c.skin, 0.22);
+        rrFill(ctx, headCX - headRX, noseY - 1, 4, 3, 1);
+        // Ear
+        ctx.fillStyle = darken(c.skin, 0.08);
+        ctx.beginPath(); ctx.arc(headCX + 7, headCY + 1, 3, 0, Math.PI * 2); ctx.fill();
+        // Mouth
+        ctx.strokeStyle = darken(c.skin, 0.25); ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(headCX - 4, mouthY, 2.5, 0, Math.PI); ctx.stroke();
+      } else {
+        // Profile: right side
+        ctx.fillStyle = '#1a2530';
+        ctx.fillRect(headCX + 3.5, eyeY - 1, 3.5, 3.5);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(headCX + 3.5, eyeY - 1, 1.5, 1.5);
+        ctx.fillStyle = c.hair;
+        ctx.fillRect(headCX + 3, eyeY - 4, 5, 1.5);
+        ctx.fillStyle = darken(c.skin, 0.22);
+        rrFill(ctx, headCX + headRX - 3, noseY - 1, 4, 3, 1);
+        ctx.fillStyle = darken(c.skin, 0.08);
+        ctx.beginPath(); ctx.arc(headCX - 7, headCY + 1, 3, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = darken(c.skin, 0.25); ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.arc(headCX + 4, mouthY, 2.5, 0, Math.PI); ctx.stroke();
+      }
+    }
+
+    // ── GLASSES (doctor / admin) ───────────────────────────────────────────────
+    if ((c.role === 'doctor' || c.role === 'admin') && isDown) {
+      ctx.strokeStyle = '#4a5568'; ctx.lineWidth = 1.5;
+      rrStroke(ctx, headCX - 9, headCY - 3, 7, 5, 2);
+      rrStroke(ctx, headCX + 2, headCY - 3, 7, 5, 2);
+      ctx.beginPath(); ctx.moveTo(headCX - 2, headCY); ctx.lineTo(headCX + 2, headCY); ctx.stroke();
     }
   }
 
@@ -443,22 +596,22 @@ export class BootScene extends Phaser.Scene {
       const ct = this.textures.createCanvas(key, 90, 90) as Phaser.Textures.CanvasTexture;
       const ctx = ct.getContext();
 
-      const hex = (n: number) => `rgb(${(n >> 16) & 0xff},${(n >> 8) & 0xff},${n & 0xff})`;
-      const skinC = def.skinColor ? hex(def.skinColor) : '#f5c5a3';
-      const coatC = hex(def.coatColor);
-      const hairC = hex(def.hairColor);
+      const hexRgb = (n: number) => `rgb(${(n >> 16) & 0xff},${(n >> 8) & 0xff},${n & 0xff})`;
+      const skinC = def.skinColor ? hexRgb(def.skinColor) : '#f5c5a3';
+      const coatC = hexRgb(def.coatColor);
+      const hairC = hexRgb(def.hairColor);
       const r0 = (def.coatColor >> 16) & 0xff;
       const g0 = (def.coatColor >> 8) & 0xff;
       const b0 = def.coatColor & 0xff;
 
-      // BG
+      // Background gradient
       ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, 90, 90);
       const bgGrad = ctx.createLinearGradient(0, 0, 90, 90);
-      bgGrad.addColorStop(0, `rgba(${r0},${g0},${b0},0.1)`);
-      bgGrad.addColorStop(1, `rgba(${r0},${g0},${b0},0.38)`);
+      bgGrad.addColorStop(0, `rgba(${r0},${g0},${b0},0.08)`);
+      bgGrad.addColorStop(1, `rgba(${r0},${g0},${b0},0.35)`);
       ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 90, 90);
 
-      // Grid lines
+      // Grid
       ctx.strokeStyle = 'rgba(0,0,0,0.04)'; ctx.lineWidth = 0.5;
       for (let j = 0; j < 90; j += 10) {
         ctx.beginPath(); ctx.moveTo(j, 0); ctx.lineTo(j, 90); ctx.stroke();
@@ -468,73 +621,92 @@ export class BootScene extends Phaser.Scene {
       // Shoulders
       ctx.fillStyle = coatC;
       ctx.beginPath();
-      ctx.moveTo(0, 90); ctx.lineTo(0, 58);
-      ctx.bezierCurveTo(5, 50, 35, 48, 45, 50);
-      ctx.bezierCurveTo(55, 48, 85, 50, 90, 58);
+      ctx.moveTo(0, 90); ctx.lineTo(0, 60);
+      ctx.bezierCurveTo(5, 52, 35, 50, 45, 52);
+      ctx.bezierCurveTo(55, 50, 85, 52, 90, 60);
       ctx.lineTo(90, 90); ctx.closePath(); ctx.fill();
 
       // Doctor lapels
       if (def.role === 'doctor') {
-        ctx.fillStyle = 'rgba(255,255,255,0.75)';
-        ctx.beginPath(); ctx.moveTo(42, 50); ctx.lineTo(0, 62); ctx.lineTo(0, 50); ctx.closePath(); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(48, 50); ctx.lineTo(90, 62); ctx.lineTo(90, 50); ctx.closePath(); ctx.fill();
-      }
-
-      // V-neck
-      ctx.fillStyle = skinC;
-      ctx.beginPath(); ctx.moveTo(40, 50); ctx.lineTo(45, 60); ctx.lineTo(50, 50); ctx.closePath(); ctx.fill();
-
-      // Neck
-      ctx.fillStyle = skinC; rrFill(ctx, 38, 38, 14, 16, 4);
-
-      // Head
-      ctx.fillStyle = skinC;
-      ctx.beginPath(); ctx.ellipse(45, 25, 18, 22, 0, 0, Math.PI * 2); ctx.fill();
-
-      // Hair
-      ctx.fillStyle = hairC;
-      ctx.beginPath(); ctx.ellipse(45, 8, 18, 12, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillRect(27, 8, 36, 18);
-
-      // Eyes
-      ctx.fillStyle = '#2c3e50';
-      ctx.fillRect(36, 22, 5, 4); ctx.fillRect(49, 22, 5, 4);
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(36, 22, 2, 2); ctx.fillRect(49, 22, 2, 2);
-
-      // Eyebrows
-      ctx.fillStyle = hairC;
-      ctx.fillRect(35, 18, 8, 2); ctx.fillRect(47, 18, 8, 2);
-
-      // Nose
-      ctx.fillStyle = 'rgba(160,80,50,0.3)';
-      ctx.beginPath(); ctx.arc(45, 30, 2, 0, Math.PI * 2); ctx.fill();
-
-      // Smile
-      ctx.strokeStyle = '#c47a5a'; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(45, 35, 6, 0.2, Math.PI - 0.2); ctx.stroke();
-
-      // Glasses (doctor)
-      if (def.role === 'doctor') {
-        ctx.strokeStyle = '#7f8c8d'; ctx.lineWidth = 1.5;
-        rrStroke(ctx, 34, 20, 9, 6, 2);
-        rrStroke(ctx, 47, 20, 9, 6, 2);
-        ctx.beginPath(); ctx.moveTo(43, 23); ctx.lineTo(47, 23); ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.beginPath(); ctx.moveTo(42, 52); ctx.lineTo(0, 65); ctx.lineTo(0, 52); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(48, 52); ctx.lineTo(90, 65); ctx.lineTo(90, 52); ctx.closePath(); ctx.fill();
       }
 
       // Stethoscope
       if (def.role === 'doctor' || def.role === 'nurse') {
-        ctx.strokeStyle = '#2c3e50'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(45, 58, 8, 0, Math.PI); ctx.stroke();
-        ctx.beginPath(); ctx.arc(45, 66, 4, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = '#1a252f'; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.arc(45, 62, 9, 0, Math.PI); ctx.stroke();
+        ctx.fillStyle = '#1a252f';
+        ctx.beginPath(); ctx.arc(45, 71, 4, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // V-neck
+      ctx.fillStyle = skinC;
+      ctx.beginPath(); ctx.moveTo(40, 52); ctx.lineTo(45, 62); ctx.lineTo(50, 52); ctx.closePath(); ctx.fill();
+
+      // Neck
+      ctx.fillStyle = skinC; rrFill(ctx, 38, 40, 14, 16, 4);
+
+      // Head
+      ctx.fillStyle = skinC;
+      ctx.beginPath(); ctx.ellipse(45, 26, 19, 22, 0, 0, Math.PI * 2); ctx.fill();
+      // Head highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.beginPath(); ctx.ellipse(38, 18, 8, 10, -0.3, 0, Math.PI * 2); ctx.fill();
+
+      // Hair
+      ctx.fillStyle = hairC;
+      ctx.beginPath(); ctx.ellipse(45, 9, 19, 13, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(26, 9, 38, 18);
+
+      // Eyebrows
+      ctx.fillStyle = hairC;
+      ctx.fillRect(33, 19, 9, 2); ctx.fillRect(48, 19, 9, 2);
+
+      // Eyes
+      ctx.fillStyle = '#1a2530';
+      ctx.fillRect(34, 23, 6, 5); ctx.fillRect(50, 23, 6, 5);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(34, 23, 2.5, 2.5); ctx.fillRect(50, 23, 2.5, 2.5);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(36, 24, 3, 3); ctx.fillRect(52, 24, 3, 3);
+
+      // Nose
+      ctx.fillStyle = darken(skinC, 0.14);
+      ctx.beginPath(); ctx.arc(45, 31, 2, 0, Math.PI * 2); ctx.fill();
+
+      // Smile
+      ctx.strokeStyle = darken(skinC, 0.22); ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.arc(45, 37, 6, 0.15, Math.PI - 0.15); ctx.stroke();
+
+      // Blush
+      ctx.fillStyle = 'rgba(220,80,80,0.18)';
+      ctx.beginPath(); ctx.arc(33, 33, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(57, 33, 4, 0, Math.PI * 2); ctx.fill();
+
+      // Glasses
+      if (def.role === 'doctor') {
+        ctx.strokeStyle = '#4a5568'; ctx.lineWidth = 1.8;
+        rrStroke(ctx, 33, 21, 10, 7, 2.5);
+        rrStroke(ctx, 47, 21, 10, 7, 2.5);
+        ctx.beginPath(); ctx.moveTo(43, 24); ctx.lineTo(47, 24); ctx.stroke();
+      }
+
+      // Nurse cap
+      if (def.role === 'nurse') {
+        ctx.fillStyle = '#ffffff';
+        rrFill(ctx, 26, 4, 38, 7, 1);
+        ctx.fillStyle = '#e74c3c';
+        ctx.fillRect(26, 7, 38, 2.5);
       }
 
       // Badge
       if (def.role === 'nurse' || def.role === 'admin' || def.role === 'receptionist') {
         ctx.fillStyle = '#e74c3c';
-        rrFill(ctx, 28, 52, 14, 18, 2);
+        rrFill(ctx, 27, 55, 15, 20, 2);
         ctx.fillStyle = '#fff';
-        ctx.fillRect(30, 56, 10, 2); ctx.fillRect(30, 60, 8, 2); ctx.fillRect(30, 64, 10, 2);
+        ctx.fillRect(29, 59, 11, 2); ctx.fillRect(29, 63, 9, 2); ctx.fillRect(29, 67, 11, 2);
       }
 
       ct.refresh();
@@ -546,25 +718,39 @@ export class BootScene extends Phaser.Scene {
       const ct = this.textures.createCanvas(pk, 90, 90) as Phaser.Textures.CanvasTexture;
       const ctx = ct.getContext();
       ctx.fillStyle = '#e0faf4'; ctx.fillRect(0, 0, 90, 90);
+      const grad = ctx.createLinearGradient(0, 0, 90, 90);
+      grad.addColorStop(0, 'rgba(26,188,156,0.1)');
+      grad.addColorStop(1, 'rgba(26,188,156,0.35)');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, 90, 90);
+      // Shoulders
       ctx.fillStyle = '#1abc9c';
-      ctx.beginPath(); ctx.moveTo(0, 90); ctx.lineTo(0, 58);
-      ctx.bezierCurveTo(5, 50, 35, 48, 45, 50);
-      ctx.bezierCurveTo(55, 48, 85, 50, 90, 58);
+      ctx.beginPath();
+      ctx.moveTo(0, 90); ctx.lineTo(0, 60);
+      ctx.bezierCurveTo(5, 52, 35, 50, 45, 52);
+      ctx.bezierCurveTo(55, 50, 85, 52, 90, 60);
       ctx.lineTo(90, 90); ctx.closePath(); ctx.fill();
+      // Stethoscope
+      ctx.strokeStyle = '#1a252f'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(45, 62, 9, 0, Math.PI); ctx.stroke();
+      ctx.fillStyle = '#1a252f'; ctx.beginPath(); ctx.arc(45, 71, 4, 0, Math.PI * 2); ctx.fill();
+      // Head/neck/hair
       ctx.fillStyle = '#f5c5a3';
-      ctx.beginPath(); ctx.ellipse(45, 25, 18, 22, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillRect(38, 38, 14, 14);
-      ctx.fillStyle = '#4a3728';
-      ctx.beginPath(); ctx.ellipse(45, 8, 18, 12, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillRect(27, 8, 36, 16);
-      ctx.beginPath(); ctx.arc(45, -4, 6, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = '#2c3e50'; ctx.fillRect(36, 22, 5, 4); ctx.fillRect(49, 22, 5, 4);
-      ctx.fillStyle = '#e74c3c'; ctx.fillRect(27, 3, 36, 3);
+      ctx.beginPath(); ctx.ellipse(45, 26, 19, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(38, 40, 14, 14);
+      ctx.fillStyle = '#2c1a12';
+      ctx.beginPath(); ctx.ellipse(45, 9, 19, 13, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(26, 9, 38, 18);
+      ctx.beginPath(); ctx.arc(45, -2, 6, 0, Math.PI * 2); ctx.fill();
+      // Cap
+      ctx.fillStyle = '#ffffff'; rrFill(ctx, 26, 4, 38, 7, 1);
+      ctx.fillStyle = '#e74c3c'; ctx.fillRect(26, 7, 38, 2.5);
+      // Eyes
+      ctx.fillStyle = '#1a2530'; ctx.fillRect(34, 23, 6, 5); ctx.fillRect(50, 23, 6, 5);
+      ctx.fillStyle = '#fff'; ctx.fillRect(34, 23, 2.5, 2.5); ctx.fillRect(50, 23, 2.5, 2.5);
       ct.refresh();
     }
   }
 
-  // ── PIXEL TEXTURE ─────────────────────────────────────────────────────────
   private createPixelTexture() {
     const key = 'pixel';
     if (this.textures.exists(key)) this.textures.remove(key);

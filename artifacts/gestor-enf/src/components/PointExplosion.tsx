@@ -63,7 +63,7 @@ export function PointExplosion({ points, isCorrect, trigger }: PointExplosionPro
   const [particles, setParticles] = useState<Particle[]>([]);
   const [show, setShow] = useState(false);
   const [tier, setTier] = useState<keyof typeof TIER_CONFIG>("good");
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     if (trigger === 0) return;
