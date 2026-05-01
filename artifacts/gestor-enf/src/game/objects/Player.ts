@@ -6,7 +6,7 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   private isMoving = false;
   private stepTimer = 0;
   private stepFrame = 0;
-  private readonly STEP_INTERVAL = 190;
+  private readonly STEP_INTERVAL = 110;
   private isSprinting = false;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
@@ -49,18 +49,18 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
   }
 
   private updateAnimation(delta: number) {
-    const interval = this.isSprinting ? 130 : this.STEP_INTERVAL;
+    const interval = this.isSprinting ? 75 : this.STEP_INTERVAL;
     if (this.isMoving) {
       this.stepTimer += delta;
       if (this.stepTimer >= interval) {
-        this.stepTimer = 0;
-        this.stepFrame = this.stepFrame === 1 ? 2 : 1;
+        this.stepTimer -= interval;
+        this.stepFrame = (this.stepFrame + 1) % 6;
       }
     } else {
       this.stepFrame = 0;
       this.stepTimer = 0;
     }
-    const dirBase: Record<Direction, number> = { down: 0, up: 3, left: 6, right: 9 };
+    const dirBase: Record<Direction, number> = { down: 0, up: 6, right: 12, left: 18 };
     this.setFrame(dirBase[this.direction] + this.stepFrame);
   }
 

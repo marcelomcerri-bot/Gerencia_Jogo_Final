@@ -4,7 +4,29 @@ import { createTilesetTexture, NPC_DEFS } from '../data/gameData';
 
 const SPR_W = 44;
 const SPR_H = 128;
-const FRAMES = 12;
+const FRAMES = 24; // 6 frames × 4 directions (down, up, right, left)
+
+// New sprite sheet pixel coordinates (measured from 1704×923 source image)
+const FRAME_COLS = [
+  { x1: 168, x2: 233 },
+  { x1: 276, x2: 344 },
+  { x1: 386, x2: 457 },
+  { x1: 498, x2: 567 },
+  { x1: 611, x2: 678 },
+  { x1: 719, x2: 787 },
+];
+const CHAR_ROWS = {
+  female: {
+    front: [14, 160] as [number, number],
+    side:  [173, 307] as [number, number],
+    back:  [321, 457] as [number, number],
+  },
+  male: {
+    front: [496, 628] as [number, number],
+    side:  [645, 770] as [number, number],
+    back:  [784, 908] as [number, number],
+  },
+};
 
 function rrFill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   if (w < 1 || h < 1) return;
@@ -231,103 +253,65 @@ export class BootScene extends Phaser.Scene {
   }
 
   /**
-   * Draw one character frame from the sprite sheet into the target canvas.
-   * sheetRow: 0=female, 1=male
-   * sheetCol: 0-4=front walk, 5-9=side walk (facing right)
+   * Draw one frame from the new sprite sheet using exact pixel coordinates.
+   * colSpec: {x1, x2} pixel range in source for this frame column
+   * rowSpec: [y1, y2] pixel range in source for this direction row
    * flipX: mirror horizontally (for left-facing)
    */
-  private drawSheetFrame(
+  private drawNewSheetFrame(
     ctx: CanvasRenderingContext2D,
     sheet: HTMLCanvasElement,
     gameFrame: number,
-    sheetCol: number,
-    sheetRow: number,
+    colSpec: { x1: number; x2: number },
+    rowSpec: [number, number],
     flipX: boolean,
   ) {
-    const COLS = 10, ROWS = 2;
-    const frameW = sheet.width / COLS;
-    const frameH = sheet.height / ROWS;
-    const srcX = sheetCol * frameW;
-    const srcY = sheetRow * frameH;
+    const srcX = colSpec.x1;
+    const srcY = rowSpec[0];
+    const srcW = colSpec.x2 - colSpec.x1 + 1;
+    const srcH = rowSpec[1] - rowSpec[0] + 1;
     const destX = gameFrame * SPR_W;
 
     if (flipX) {
       ctx.save();
       ctx.translate(destX + SPR_W, 0);
       ctx.scale(-1, 1);
-      ctx.drawImage(sheet, srcX, srcY, frameW, frameH, 0, 0, SPR_W, SPR_H);
+      ctx.drawImage(sheet, srcX, srcY, srcW, srcH, 0, 0, SPR_W, SPR_H);
       ctx.restore();
     } else {
-      ctx.drawImage(sheet, srcX, srcY, frameW, frameH, destX, 0, SPR_W, SPR_H);
+      ctx.drawImage(sheet, srcX, srcY, srcW, srcH, destX, 0, SPR_W, SPR_H);
     }
   }
 
-  private createPlayerSpriteFromSheet() {
-    const key = 'player';
+  private buildCharSprite(key: string, rows: { front: [number,number]; side: [number,number]; back: [number,number] }, sheet: HTMLCanvasElement) {
     if (this.textures.exists(key)) this.textures.remove(key);
-
-    const imgEl = this.textures.get('nurses_sprite').getSourceImage() as HTMLImageElement;
-    const sheet = this.buildTransparentSheet(imgEl);
-
     const ct = this.textures.createCanvas(key, SPR_W * FRAMES, SPR_H) as Phaser.Textures.CanvasTexture;
     const ctx = ct.getContext();
 
-    // Female nurse = row 0. Front cols 0-4, side cols 5-9 (facing right).
-    // Game frames: down(0-2), up(3-5), left(6-8), right(9-11)
-    // [gameFrame, sheetCol, sheetRow, flipX]
-    const map: [number, number, number, boolean][] = [
-      [0, 2, 0, false], // down idle
-      [1, 1, 0, false], // down step1
-      [2, 3, 0, false], // down step2
-      [3, 2, 0, false], // up idle (no back view, reuse front)
-      [4, 1, 0, false], // up step1
-      [5, 3, 0, false], // up step2
-      [6, 5, 0, true],  // left idle (side frame, flipped)
-      [7, 6, 0, true],  // left step1
-      [8, 7, 0, true],  // left step2
-      [9, 5, 0, false], // right idle (side frame)
-      [10, 6, 0, false],// right step1
-      [11, 7, 0, false],// right step2
-    ];
-
-    for (const [gf, sc, sr, fx] of map) {
-      this.drawSheetFrame(ctx, sheet, gf, sc, sr, fx);
+    // Game frame layout: down(0-5)=front, up(6-11)=back, right(12-17)=side, left(18-23)=side flipped
+    for (let f = 0; f < 6; f++) {
+      this.drawNewSheetFrame(ctx, sheet, f,      FRAME_COLS[f], rows.front, false); // down
+      this.drawNewSheetFrame(ctx, sheet, 6 + f,  FRAME_COLS[f], rows.back,  false); // up
+      this.drawNewSheetFrame(ctx, sheet, 12 + f, FRAME_COLS[f], rows.side,  false); // right
+      this.drawNewSheetFrame(ctx, sheet, 18 + f, FRAME_COLS[f], rows.side,  true);  // left (mirrored)
     }
+
     ct.refresh();
     for (let i = 0; i < FRAMES; i++) ct.add(i, 0, i * SPR_W, 0, SPR_W, SPR_H);
+  }
+
+  private createPlayerSpriteFromSheet() {
+    const imgEl = this.textures.get('nurses_sprite').getSourceImage() as HTMLImageElement;
+    const sheet = this.buildTransparentSheet(imgEl);
+    this.buildCharSprite('player', CHAR_ROWS.female, sheet);
   }
 
   private createNPCSpritesFromSheet() {
     const imgEl = this.textures.get('nurses_sprite').getSourceImage() as HTMLImageElement;
     const sheet = this.buildTransparentSheet(imgEl);
 
-    // Male nurse = row 1. Same column layout as female.
-    const map: [number, number, number, boolean][] = [
-      [0, 2, 1, false],
-      [1, 1, 1, false],
-      [2, 3, 1, false],
-      [3, 2, 1, false],
-      [4, 1, 1, false],
-      [5, 3, 1, false],
-      [6, 5, 1, true],
-      [7, 6, 1, true],
-      [8, 7, 1, true],
-      [9, 5, 1, false],
-      [10, 6, 1, false],
-      [11, 7, 1, false],
-    ];
-
     for (const def of NPC_DEFS) {
-      const key = def.spriteKey;
-      if (this.textures.exists(key)) this.textures.remove(key);
-      const ct = this.textures.createCanvas(key, SPR_W * FRAMES, SPR_H) as Phaser.Textures.CanvasTexture;
-      const ctx = ct.getContext();
-
-      for (const [gf, sc, sr, fx] of map) {
-        this.drawSheetFrame(ctx, sheet, gf, sc, sr, fx);
-      }
-      ct.refresh();
-      for (let i = 0; i < FRAMES; i++) ct.add(i, 0, i * SPR_W, 0, SPR_W, SPR_H);
+      this.buildCharSprite(def.spriteKey, CHAR_ROWS.male, sheet);
     }
   }
 

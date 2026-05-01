@@ -9,7 +9,7 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
   private direction: Direction = 'down';
   private stepTimer = 0;
   private stepFrame = 0;
-  private readonly STEP_INTERVAL = 280;
+  private readonly STEP_INTERVAL = 150;
   private waypointIdx = 0;
   private waitTimer = 0;
   private isWaiting = false;
@@ -228,14 +228,14 @@ export class NPC extends Phaser.Physics.Arcade.Sprite {
     if (moving) {
       this.stepTimer += delta;
       if (this.stepTimer >= this.STEP_INTERVAL) {
-        this.stepTimer = 0;
-        this.stepFrame = this.stepFrame === 1 ? 2 : 1;
+        this.stepTimer -= this.STEP_INTERVAL;
+        this.stepFrame = (this.stepFrame + 1) % 6;
       }
     } else {
       this.stepFrame = 0;
       this.stepTimer = 0;
     }
-    const dirBase: Record<Direction, number> = { down: 0, up: 3, left: 6, right: 9 };
+    const dirBase: Record<Direction, number> = { down: 0, up: 6, right: 12, left: 18 };
     this.setFrame(dirBase[this.direction] + this.stepFrame);
   }
 
