@@ -212,19 +212,22 @@ export class HUDScene extends Phaser.Scene {
     // ─── TIME / DAY ──────────────────────────────────── x: 0..144 ────────────
     sec(0, 144);
 
-    // Shift indicator dot (coloured rectangle, no emoji)
-    this.shiftIcon = this.add.text(bx + 10, by + 10, 'TURNO', {
+    // LEFT column: day label, day number, shift
+    this.shiftIcon = this.add.text(bx + 8, by + 9, 'TURNO', {
       fontFamily: "'Press Start 2P', monospace",
       fontSize: '6px', color: '#3498db',
     });
 
-    this.dayText = this.add.text(bx + 10, by + 24, 'DIA 1 · MANHA', {
-      fontFamily: "'VT323', monospace", fontSize: '19px', color: '#f1c40f',
+    this.dayText = this.add.text(bx + 8, by + 22, 'DIA 1', {
+      fontFamily: "'VT323', monospace", fontSize: '18px', color: '#f1c40f',
     });
 
-    this.timeText = this.add.text(bx + 72, by + 8, '08:00', {
-      fontFamily: "'VT323', monospace", fontSize: '44px', color: '#f1c40f',
-    }).setOrigin(0.5, 0);
+    // shift name sits below day number
+    // (re-use dayText for both – see onHudUpdate which now writes "DIA N\nSHIFT")
+    // RIGHT column: clock, right-aligned inside section
+    this.timeText = this.add.text(bx + 140, by + 9, '08:00', {
+      fontFamily: "'VT323', monospace", fontSize: '30px', color: '#f1c40f',
+    }).setOrigin(1, 0);
 
     // ─── ENERGY ──────────────────────────────────────── x: 152..330 ──────────
     sec(152, 178);
@@ -376,7 +379,8 @@ export class HUDScene extends Phaser.Scene {
 
     const shiftName = h >= 7 && h < 15 ? 'MANHA' : h >= 15 && h < 23 ? 'TARDE' : 'NOITE';
     const shiftColor = h >= 7 && h < 15 ? '#f1c40f' : h >= 15 && h < 23 ? '#e67e22' : '#9b59b6';
-    this.dayText.setText(`DIA ${state.day}  ${shiftName}`).setColor(shiftColor);
+    // Two lines: "DIA 1" then shift name below
+    this.dayText.setText(`DIA ${state.day}\n${shiftName}`).setColor(shiftColor);
     this.shiftIcon.setColor(shiftColor);
 
     // Energy bar — guard against zero/negative fill widths

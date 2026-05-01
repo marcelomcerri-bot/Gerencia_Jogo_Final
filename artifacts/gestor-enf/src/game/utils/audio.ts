@@ -8,8 +8,10 @@ function getAudioCtx(): AudioContext | null {
   try {
     const Ctx = window.AudioContext || (window as any).webkitAudioContext;
     if (!Ctx) return null;
+    // Recreate if closed (happens during HMR / page transitions)
+    if (globalAudioCtx && globalAudioCtx.state === 'closed') globalAudioCtx = null;
     if (!globalAudioCtx) globalAudioCtx = new Ctx();
-    if (globalAudioCtx.state === 'suspended') globalAudioCtx.resume();
+    if (globalAudioCtx.state === 'suspended') globalAudioCtx.resume().catch(() => {});
     return globalAudioCtx;
   } catch { return null; }
 }
@@ -114,15 +116,17 @@ const GAME_CHORD: NoteStep[] = [
   ['F3',2],['B3',2],['C4',2],['C4',2],
 ];
 
+// Returns the batch of nodes created for this loop iteration
 function scheduleTrack(
   ctx: AudioContext,
   masterGain: GainNode,
   melody: NoteStep[], bass: NoteStep[], chord: NoteStep[],
   startTime: number,
   bpm: number,
-  onLoop: () => void,
-): void {
+  onLoop: (prevBatch: AudioNode[]) => void,
+): AudioNode[] {
   const beatDur = 60 / bpm;
+  const batch: AudioNode[] = [];
 
   const makeOsc = (type: OscillatorType, freq: number, t: number, dur: number, vol: number) => {
     if (freq === 0) return;
@@ -138,7 +142,7 @@ function scheduleTrack(
     g.connect(masterGain);
     osc.start(t);
     osc.stop(t + dur * beatDur + 0.01);
-    musicNodes.push(osc, g);
+    batch.push(osc, g);
   };
 
   let t = startTime;
@@ -160,19 +164,26 @@ function scheduleTrack(
     ct += d * beatDur;
   }
 
-  // Pulse/arpegio percussion feel
-  const arpNotes = ['C4','E4','G4','E4'];
-  for (let i = 0; i < totalBeats * 2; i++) {
+  // Arpeggio feel (sparse - only every other beat to reduce node count)
+  const arpNotes = ['C4', 'E4', 'G4', 'E4'];
+  for (let i = 0; i < totalBeats; i++) {
     const freq = NOTE[arpNotes[i % arpNotes.length]];
-    const pt = startTime + i * (beatDur * 0.5);
-    if (pt < loopEnd) makeOsc('square', freq, pt, 0.1, 0.03);
+    const pt = startTime + i * beatDur;
+    if (pt < loopEnd) makeOsc('square', freq, pt, 0.12, 0.025);
   }
 
   const until = loopEnd - ctx.currentTime;
   const timer = setTimeout(() => {
-    onLoop();
-  }, Math.max(0, (until - 0.1) * 1000));
+    // Disconnect the PREVIOUS loop's batch — they're done by now
+    onLoop(batch);
+  }, Math.max(0, (until - 0.05) * 1000));
   musicSchedulerTimer = timer;
+
+  return batch;
+}
+
+function disconnectBatch(batch: AudioNode[]) {
+  for (const n of batch) { try { n.disconnect(); } catch { } }
 }
 
 export function playMusic(track: 'menu' | 'game') {
@@ -184,22 +195,27 @@ export function playMusic(track: 'menu' | 'game') {
 
   const masterGain = ctx.createGain();
   masterGain.gain.setValueAtTime(0, ctx.currentTime);
-  masterGain.gain.linearRampToValueAtTime(0.5, ctx.currentTime + 2.0);
+  masterGain.gain.linearRampToValueAtTime(0.45, ctx.currentTime + 2.0);
   masterGain.connect(ctx.destination);
   musicGain = masterGain;
 
   const bpm = track === 'menu' ? 76 : 68;
   const melody = track === 'menu' ? MENU_MELODY : GAME_MELODY;
-  const bass = track === 'menu' ? MENU_BASS : GAME_BASS;
-  const chord = track === 'menu' ? MENU_CHORD : GAME_CHORD;
+  const bass   = track === 'menu' ? MENU_BASS   : GAME_BASS;
+  const chord  = track === 'menu' ? MENU_CHORD  : GAME_CHORD;
 
-  const loop = () => {
-    if (currentTrack !== track) return;
+  const loop = (prevBatch: AudioNode[]) => {
+    if (currentTrack !== track) { disconnectBatch(prevBatch); return; }
     const c = getAudioCtx();
-    if (!c) return;
+    if (!c) { disconnectBatch(prevBatch); return; }
+    // Disconnect the previous iteration's nodes now that they've stopped
+    disconnectBatch(prevBatch);
     scheduleTrack(c, masterGain, melody, bass, chord, c.currentTime, bpm, loop);
   };
-  scheduleTrack(ctx, masterGain, melody, bass, chord, ctx.currentTime, bpm, loop);
+
+  const firstBatch = scheduleTrack(ctx, masterGain, melody, bass, chord, ctx.currentTime, bpm, loop);
+  // Track only the first batch in musicNodes so stopMusic() can clean up if called early
+  musicNodes = firstBatch;
 }
 
 export function stopMusic() {
