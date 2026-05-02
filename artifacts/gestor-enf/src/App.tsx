@@ -122,8 +122,14 @@ export default function App() {
   }, [portrait]);
 
   const handleStartGame = () => {
-    const menu = gameRef.current?.scene.getScene("MenuScene") as any;
-    if (menu?.startGame) menu.startGame();
+    // Primary: use the reliable global hook set by MenuScene.create()
+    if ((window as any).triggerStartGame) {
+      (window as any).triggerStartGame();
+    } else {
+      // Fallback: direct scene query
+      const menu = gameRef.current?.scene.getScene("MenuScene") as any;
+      if (menu?.startGame) menu.startGame();
+    }
   };
 
   // -------------------------------------------------------------------------

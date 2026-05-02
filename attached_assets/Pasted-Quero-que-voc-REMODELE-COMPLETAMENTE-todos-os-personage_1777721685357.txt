@@ -1,0 +1,122 @@
+Quero que você REMODELE COMPLETAMENTE todos os personagens do jogo.
+
+PROBLEMA ATUAL:
+Todos os NPCs estão usando praticamente o mesmo sprite, mesma silhueta, mesmo cabelo e mesma estrutura visual, o que deixa o hospital artificial, repetitivo e sem vida.
+
+OBJETIVO:
+Criar automaticamente uma grande variedade de personagens únicos em pixel art premium, mantendo consistência artística total com o estilo atual do jogo.
+
+IMPORTANTE:
+NÃO reutilizar o mesmo sprite mudando apenas a cor.
+NÃO criar personagens genéricos.
+NÃO gerar pixel art simples ou infantil.
+NÃO usar sprites deformados.
+NÃO criar cabeças enormes.
+NÃO usar outlines pretos pesados.
+NÃO deixar todos com mesma altura, cabelo ou roupa.
+
+O resultado deve parecer um jogo indie premium da Steam.
+
+ESTILO VISUAL:
+• pixel art refinada
+• estética hospitalar moderna
+• proporções naturais
+• iluminação suave
+• sombra delicada
+• sprites limpos
+• visual semelhante a Stardew Valley moderno + Project Hospital
+• movimento fluido
+• aparência humana e acolhedora
+
+CRIAR VARIAÇÕES REAIS ENTRE PERSONAGENS:
+
+TIPOS DE PERSONAGENS:
+• médicos homens
+• médicas
+• enfermeiros
+• enfermeiras
+• técnicos de enfermagem
+• recepcionistas
+• faxineiros
+• fisioterapeutas
+• pacientes jovens
+• pacientes idosos
+• acompanhantes
+• crianças
+• residentes
+• seguranças
+• pacientes debilitados
+• pacientes em tratamento oncológico
+
+DIVERSIDADE:
+Criar personagens:
+• brancos
+• negros
+• pardos
+• asiáticos
+• idosos
+• jovens
+• homens
+• mulheres
+
+VARIAÇÕES VISUAIS:
+Cada personagem deve possuir combinação própria de:
+• cabelo
+• rosto
+• tom de pele
+• roupa
+• altura visual
+• acessórios
+• postura
+• expressão
+• uniforme
+• corpo
+• penteado
+
+CABELOS:
+Criar vários estilos:
+• curto
+• cacheado
+• crespo
+• liso
+• coque
+• preso
+• volumoso
+• raspado
+• grisalho
+• ondulado
+
+ROUPAS:
+• scrubs variados
+• jalecos
+• roupas administrativas
+• roupas casuais
+• roupas hospitalares
+• crachás
+• máscaras
+• estetoscópios
+• luvas
+• acessórios médicos
+
+ANIMAÇÕES:
+Todos devem possuir:
+• idle
+• andando para frente
+• andando para trás
+• andando de lado
+• movimentação fluida
+• braços sincronizados
+• pernas naturais
+• leve movimento corporal
+
+QUALIDADE:
+Cada personagem deve parecer desenhado individualmente.
+Evitar aparência procedural repetitiva.
+Criar sensação de hospital vivo e humano.
+
+IMPORTANTE:
+Manter TODOS os sprites na mesma escala e mesma proporção.
+Todos devem encaixar perfeitamente no tilemap atual sem quebrar colisão ou alinhamento.
+
+RESULTADO FINAL:
+O hospital deve parecer cheio de pessoas reais, diversas e únicas, como um verdadeiro hospital moderno humanizado.

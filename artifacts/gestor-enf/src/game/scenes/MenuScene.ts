@@ -17,8 +17,16 @@ export class MenuScene extends Phaser.Scene {
     });
   }
 
+  shutdown() {
+    delete (window as any).triggerStartGame;
+  }
+
   create() {
     this.starting = false;
+    // Expose a reliable global hook so React can trigger game start
+    // without depending on Phaser's scene.getScene() timing.
+    (window as any).triggerStartGame = () => this.startGame();
+
     // Ensure React router is on '/' so the home buttons always render,
     // even when the page is hard-refreshed while the game was running.
     this.time.delayedCall(120, () => {

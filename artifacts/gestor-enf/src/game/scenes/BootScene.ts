@@ -61,12 +61,54 @@ function rrStroke(ctx: CanvasRenderingContext2D, x: number, y: number, w: number
 }
 
 function darken(hex: string, amount = 0.2): string {
-  const n = parseInt(hex.replace('#', ''), 16);
-  const r = Math.max(0, ((n >> 16) & 0xff) * (1 - amount)) | 0;
-  const g = Math.max(0, ((n >> 8) & 0xff) * (1 - amount)) | 0;
-  const b = Math.max(0, (n & 0xff) * (1 - amount)) | 0;
+  let r: number, g: number, b: number;
+  if (hex.startsWith('rgb')) {
+    const m = hex.match(/\d+/g)!;
+    r = +m[0]; g = +m[1]; b = +m[2];
+  } else {
+    const n = parseInt(hex.replace('#', ''), 16);
+    r = (n >> 16) & 0xff; g = (n >> 8) & 0xff; b = n & 0xff;
+  }
+  r = Math.max(0, Math.min(255, r * (1 - amount))) | 0;
+  g = Math.max(0, Math.min(255, g * (1 - amount))) | 0;
+  b = Math.max(0, Math.min(255, b * (1 - amount))) | 0;
   return `rgb(${r},${g},${b})`;
 }
+
+// ── CHARACTER VISUAL PROFILES ─────────────────────────────────────────────────
+interface CharVisual {
+  gender: 'male' | 'female';
+  hairStyle: string;
+  build: 'slim' | 'medium' | 'stocky';
+  groundYOff: number;
+  age: 'young' | 'adult' | 'senior';
+  accessory: 'none' | 'glasses' | 'surgical_cap' | 'mask';
+  nurseCap: boolean;
+}
+
+const DEFAULT_VISUAL: CharVisual = {
+  gender: 'male', hairStyle: 'short_neat', build: 'medium', groundYOff: 0,
+  age: 'adult', accessory: 'none', nurseCap: false,
+};
+
+const CHAR_VISUALS: Record<string, CharVisual> = {
+  player:        { gender: 'female', hairStyle: 'bun',              build: 'medium', groundYOff:  0, age: 'adult',  accessory: 'none',         nurseCap: true  },
+  npc_ana:       { gender: 'female', hairStyle: 'bob',              build: 'medium', groundYOff:  3, age: 'adult',  accessory: 'none',         nurseCap: false },
+  npc_carlos:    { gender: 'male',   hairStyle: 'low_fade',         build: 'medium', groundYOff: -2, age: 'adult',  accessory: 'none',         nurseCap: false },
+  npc_joao:      { gender: 'male',   hairStyle: 'curly_top',        build: 'slim',   groundYOff:  0, age: 'young',  accessory: 'glasses',      nurseCap: false },
+  npc_renata:    { gender: 'female', hairStyle: 'ponytail',         build: 'medium', groundYOff:  0, age: 'adult',  accessory: 'none',         nurseCap: false },
+  npc_farias:    { gender: 'male',   hairStyle: 'receding',         build: 'stocky', groundYOff: -4, age: 'senior', accessory: 'none',         nurseCap: false },
+  npc_diretora:  { gender: 'female', hairStyle: 'updo',             build: 'medium', groundYOff:  0, age: 'senior', accessory: 'glasses',      nurseCap: false },
+  npc_rosa:      { gender: 'female', hairStyle: 'afro_short',       build: 'stocky', groundYOff:  4, age: 'adult',  accessory: 'surgical_cap', nurseCap: false },
+  npc_clara:     { gender: 'female', hairStyle: 'loose_long',       build: 'slim',   groundYOff:  0, age: 'young',  accessory: 'none',         nurseCap: false },
+  npc_maria:     { gender: 'female', hairStyle: 'high_pony',        build: 'medium', groundYOff:  2, age: 'adult',  accessory: 'none',         nurseCap: false },
+  npc_dr:        { gender: 'male',   hairStyle: 'business',         build: 'medium', groundYOff: -4, age: 'adult',  accessory: 'none',         nurseCap: false },
+  npc_santos:    { gender: 'female', hairStyle: 'long_tied',        build: 'slim',   groundYOff: -2, age: 'adult',  accessory: 'none',         nurseCap: false },
+  npc_pedro:     { gender: 'male',   hairStyle: 'short_wavy',       build: 'slim',   groundYOff:  0, age: 'young',  accessory: 'none',         nurseCap: false },
+  npc_patient_1: { gender: 'male',   hairStyle: 'bald',             build: 'stocky', groundYOff:  2, age: 'senior', accessory: 'none',         nurseCap: false },
+  npc_patient_2: { gender: 'female', hairStyle: 'short_curly_gray', build: 'stocky', groundYOff:  3, age: 'senior', accessory: 'none',         nurseCap: false },
+  npc_patient_3: { gender: 'male',   hairStyle: 'short_neat',       build: 'medium', groundYOff:  0, age: 'adult',  accessory: 'none',         nurseCap: false },
+};
 
 export class BootScene extends Phaser.Scene {
   constructor() { super({ key: SCENES.BOOT }); }
@@ -99,14 +141,10 @@ export class BootScene extends Phaser.Scene {
 
   create() {
     createTilesetTexture(this);
-    // Use new sprite-sheet-based character creation if texture loaded, else fallback
-    if (this.textures.exists('nurses_sprite')) {
-      this.createPlayerSpriteFromSheet();
-      this.createNPCSpritesFromSheet();
-    } else {
-      this.createPlayerSprite();
-      this.createNPCSprites();
-    }
+    // Always use procedural sprite system for full visual diversity.
+    // The sprite-sheet approach only has 2 designs (male/female) — all NPCs looked identical.
+    this.createPlayerSprite();
+    this.createNPCSprites();
     this.createPortraits();
     this.createPixelTexture();
     this.createLightTextures();
@@ -185,13 +223,14 @@ export class BootScene extends Phaser.Scene {
     if (this.textures.exists(key)) this.textures.remove(key);
     const ct = this.textures.createCanvas(key, SPR_W * FRAMES, SPR_H) as Phaser.Textures.CanvasTexture;
     const ctx = ct.getContext();
+    const visual = CHAR_VISUALS[key] ?? DEFAULT_VISUAL;
 
     for (let dir = 0; dir < 4; dir++) {
       for (let step = 0; step < 6; step++) {
         this.drawCharacter(ctx, dir * 6 + step, dir, step, {
           skin: '#f5c5a3', coat: '#1abc9c', coatDark: '#12876b',
           pants: '#0e6b55', hair: '#2c1a12', shoe: '#1a0f08',
-          role: 'nurse', isPlayer: true,
+          role: 'nurse', isPlayer: true, visual,
         });
       }
     }
@@ -200,20 +239,21 @@ export class BootScene extends Phaser.Scene {
   }
 
   private createNPCSprites() {
+    const hexRgb = (n: number) => `rgb(${(n >> 16) & 0xff},${(n >> 8) & 0xff},${n & 0xff})`;
+    const hexDark = (n: number, p = 0.3) => {
+      const r = Math.max(0, ((n >> 16) & 0xff) * (1 - p)) | 0;
+      const g = Math.max(0, ((n >> 8) & 0xff) * (1 - p)) | 0;
+      const b = Math.max(0, (n & 0xff) * (1 - p)) | 0;
+      return `rgb(${r},${g},${b})`;
+    };
+    const pantsDark = (n: number) => hexDark(n, 0.45);
+
     for (const def of NPC_DEFS) {
       const key = def.spriteKey;
       if (this.textures.exists(key)) this.textures.remove(key);
       const ct = this.textures.createCanvas(key, SPR_W * FRAMES, SPR_H) as Phaser.Textures.CanvasTexture;
       const ctx = ct.getContext();
-
-      const hexRgb = (n: number) => `rgb(${(n >> 16) & 0xff},${(n >> 8) & 0xff},${n & 0xff})`;
-      const hexDark = (n: number, p = 0.3) => {
-        const r = Math.max(0, ((n >> 16) & 0xff) * (1 - p)) | 0;
-        const g = Math.max(0, ((n >> 8) & 0xff) * (1 - p)) | 0;
-        const b = Math.max(0, (n & 0xff) * (1 - p)) | 0;
-        return `rgb(${r},${g},${b})`;
-      };
-      const pantsDark = (n: number) => hexDark(n, 0.45);
+      const visual = CHAR_VISUALS[key] ?? DEFAULT_VISUAL;
 
       for (let dir = 0; dir < 4; dir++) {
         for (let step = 0; step < 6; step++) {
@@ -226,6 +266,7 @@ export class BootScene extends Phaser.Scene {
             shoe: '#1a1008',
             role: def.role,
             isPlayer: false,
+            visual,
           });
         }
       }
@@ -333,18 +374,18 @@ export class BootScene extends Phaser.Scene {
   private drawCharacter(
     ctx: CanvasRenderingContext2D,
     fi: number, dir: number, step: number,
-    c: { skin: string; coat: string; coatDark: string; pants: string; hair: string; shoe: string; role: string; isPlayer: boolean },
+    c: { skin: string; coat: string; coatDark: string; pants: string; hair: string; shoe: string; role: string; isPlayer: boolean; visual: CharVisual },
   ) {
     const x = fi * SPR_W;
     ctx.clearRect(x, 0, SPR_W, SPR_H);
 
+    const { visual } = c;
     const isDown = dir === 0, isUp = dir === 1;
     const isLeft = dir === 2, isRight = dir === 3;
     const isLR = isLeft || isRight;
     const moving = step > 0;
     const facing = isRight ? 1 : -1;
 
-    // 6-frame smooth walk cycle using sinusoidal animation
     const phase = moving ? (step - 1) * (Math.PI * 2 / 5) : 0;
     const stride = moving ? Math.sin(phase) * 8 : 0;
     const strideB = -stride;
@@ -354,34 +395,35 @@ export class BootScene extends Phaser.Scene {
     const tilt = moving && isLR ? Math.sin(phase) * 0.5 : 0;
     const cx = x + SPR_W / 2;
 
-    // Bigger character — groundY=72 places feet lower in the 128px canvas
-    const groundY = 72;
-    const bodyBase = groundY + bob; // feet baseline
+    // Build-based width adjustments
+    const buildOff = visual.build === 'slim' ? -2 : visual.build === 'stocky' ? 3 : 0;
+    const legW1 = 7 + (buildOff > 0 ? 2 : 0);
+    const legW2 = 8 + (buildOff > 0 ? 2 : 0);
+
+    // Height adjustment via groundY offset
+    const groundY = 72 + visual.groundYOff;
+    const bodyBase = groundY + bob;
 
     // ── SHADOW ──────────────────────────────────────────────────────────────
     ctx.globalAlpha = 0.22;
     ctx.fillStyle = '#000';
     ctx.beginPath();
-    ctx.ellipse(cx + (isLR ? facing * stride * 0.1 : 0), groundY + 2, 11, 3.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx + (isLR ? facing * stride * 0.1 : 0), groundY + 2, 11 + buildOff, 3.5, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
 
     // ── FEET / SHOES ─────────────────────────────────────────────────────────
     ctx.fillStyle = c.shoe;
     if (isLR) {
-      // Front foot
       const ffx = cx - 2 + facing * (stride * 0.7);
       const bfx = cx - 2 - facing * (stride * 0.5);
-      // Back foot (slightly lighter for depth)
       ctx.globalAlpha = 0.7;
       rrFill(ctx, bfx - 5, bodyBase - 4, 12, 5, 2);
       ctx.globalAlpha = 1;
       rrFill(ctx, ffx - 4, bodyBase - 4, 13, 5, 2);
-      // Toe highlight
       ctx.fillStyle = darken(c.shoe, -0.4);
       ctx.fillRect(ffx + 8, bodyBase - 3, 2, 2);
     } else {
-      // Down/Up view: two feet side by side with stride
       const leftFoot = bodyBase + (moving ? stride * 0.5 : 0);
       const rightFoot = bodyBase + (moving ? strideB * 0.5 : 0);
       rrFill(ctx, cx - 12, leftFoot - 4, 10, 5, 2);
@@ -390,37 +432,31 @@ export class BootScene extends Phaser.Scene {
 
     // ── LEGS / PANTS ──────────────────────────────────────────────────────────
     if (isLR) {
-      // Back leg (drawn first = behind)
       ctx.fillStyle = darken(c.pants, 0.2);
       const bLegX = cx - 4 - facing * (stride * 0.45);
-      rrFill(ctx, bLegX, bodyBase - 23, 7, 20, 3);
-      // Front leg
+      rrFill(ctx, bLegX, bodyBase - 23, legW1, 20, 3);
       ctx.fillStyle = c.pants;
       const fLegX = cx - 3 + facing * (stride * 0.55);
-      rrFill(ctx, fLegX, bodyBase - 23, 8, 20, 3);
-      // Knee highlight on front leg
+      rrFill(ctx, fLegX, bodyBase - 23, legW2, 20, 3);
       ctx.fillStyle = darken(c.pants, -0.15);
       ctx.fillRect(fLegX + 1, bodyBase - 18, 4, 3);
     } else {
-      // Front view: two legs
       ctx.fillStyle = c.pants;
       const leftLegY = bodyBase - 22 + (moving ? stride * 0.5 : 0);
       const rightLegY = bodyBase - 22 + (moving ? strideB * 0.5 : 0);
-      rrFill(ctx, cx - 12, leftLegY, 9, 22, 3);
-      rrFill(ctx, cx + 3, rightLegY, 9, 22, 3);
-      // Leg shading
+      rrFill(ctx, cx - 12, leftLegY, 8 + buildOff, 22, 3);
+      rrFill(ctx, cx + 3 + buildOff, rightLegY, 8 + buildOff, 22, 3);
       ctx.fillStyle = darken(c.pants, 0.2);
       ctx.fillRect(cx - 3, leftLegY + 14, 2, 8);
-      ctx.fillRect(cx + 10, rightLegY + 14, 2, 8);
+      ctx.fillRect(cx + 10 + buildOff, rightLegY + 14, 2, 8);
     }
 
     // ── TORSO / UNIFORM TOP ───────────────────────────────────────────────────
     const torsoY = bodyBase - 44 + bob * 0.4;
-    const torsoW = isLR ? 20 : 23;
+    const torsoW = (isLR ? 20 : 23) + buildOff;
     const torsoH = 22;
     const torsoX = cx - torsoW / 2;
 
-    // Save/restore for tilt
     if (tilt !== 0 && isLR) {
       ctx.save();
       ctx.translate(cx, torsoY + torsoH / 2);
@@ -428,18 +464,12 @@ export class BootScene extends Phaser.Scene {
       ctx.translate(-cx, -(torsoY + torsoH / 2));
     }
 
-    // Torso shadow/depth
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.fillRect(torsoX + 2, torsoY + 2, torsoW, torsoH);
-
-    // Main torso
     ctx.fillStyle = c.coat;
     rrFill(ctx, torsoX, torsoY, torsoW, torsoH, 4);
-
-    // Torso shading — sides and bottom
     ctx.fillStyle = c.coatDark;
     if (isLR) {
-      // Side shading (back side darker)
       const shadeSide = facing > 0 ? torsoX : torsoX + torsoW - 4;
       rrFill(ctx, shadeSide, torsoY, 4, torsoH, 2);
     }
@@ -452,20 +482,16 @@ export class BootScene extends Phaser.Scene {
       ctx.beginPath();
       if (isLR) {
         const vx = facing > 0 ? torsoX + 4 : torsoX + torsoW - 8;
-        ctx.moveTo(vx, torsoY + 1);
-        ctx.lineTo(vx + 4, torsoY + 1);
-        ctx.lineTo(vx + 2, torsoY + 8);
+        ctx.moveTo(vx, torsoY + 1); ctx.lineTo(vx + 4, torsoY + 1); ctx.lineTo(vx + 2, torsoY + 8);
         ctx.closePath();
       } else {
-        ctx.moveTo(cx - 3, torsoY + 1);
-        ctx.lineTo(cx + 3, torsoY + 1);
-        ctx.lineTo(cx, torsoY + 9);
+        ctx.moveTo(cx - 3, torsoY + 1); ctx.lineTo(cx + 3, torsoY + 1); ctx.lineTo(cx, torsoY + 9);
         ctx.closePath();
       }
       ctx.fill();
     }
 
-    // Doctor white coat
+    // Doctor white coat lapels
     if (c.role === 'doctor') {
       ctx.fillStyle = 'rgba(255,255,255,0.92)';
       if (isLR) {
@@ -473,13 +499,10 @@ export class BootScene extends Phaser.Scene {
       } else if (!isUp) {
         rrFill(ctx, torsoX - 2, torsoY, 5, torsoH + 2, 2);
         rrFill(ctx, torsoX + torsoW - 3, torsoY, 5, torsoH + 2, 2);
-        // Lapels
         ctx.beginPath();
-        ctx.moveTo(cx - 2, torsoY + 1); ctx.lineTo(cx - 10, torsoY + 10);
-        ctx.lineTo(cx - 10, torsoY + 1); ctx.closePath(); ctx.fill();
+        ctx.moveTo(cx - 2, torsoY + 1); ctx.lineTo(cx - 10, torsoY + 10); ctx.lineTo(cx - 10, torsoY + 1); ctx.closePath(); ctx.fill();
         ctx.beginPath();
-        ctx.moveTo(cx + 2, torsoY + 1); ctx.lineTo(cx + 10, torsoY + 10);
-        ctx.lineTo(cx + 10, torsoY + 1); ctx.closePath(); ctx.fill();
+        ctx.moveTo(cx + 2, torsoY + 1); ctx.lineTo(cx + 10, torsoY + 10); ctx.lineTo(cx + 10, torsoY + 1); ctx.closePath(); ctx.fill();
       }
     }
 
@@ -539,13 +562,10 @@ export class BootScene extends Phaser.Scene {
     // ── ARMS ──────────────────────────────────────────────────────────────────
     const armY = torsoY + 2;
     const armH = 18;
-
     if (isLR) {
-      // Back arm
       const backArmX = facing > 0 ? torsoX - 5 : torsoX + torsoW - 1;
       ctx.fillStyle = darken(c.role === 'doctor' ? '#ffffff' : c.coat, 0.25);
       rrFill(ctx, backArmX, armY + armSwingB, 7, armH, 3);
-      // Front arm
       const frontArmX = facing > 0 ? torsoX + torsoW - 2 : torsoX - 6;
       ctx.fillStyle = c.role === 'doctor' ? '#f0f0f0' : c.coat;
       rrFill(ctx, frontArmX, armY + armSwing, 7, armH, 3);
@@ -553,7 +573,6 @@ export class BootScene extends Phaser.Scene {
       ctx.fillStyle = c.role === 'doctor' ? '#f0f0f0' : c.coat;
       rrFill(ctx, cx - 16, armY + armSwing, 7, armH, 3);
       rrFill(ctx, cx + 9, armY + armSwingB, 7, armH, 3);
-      // Arm shading
       ctx.fillStyle = 'rgba(0,0,0,0.1)';
       ctx.fillRect(cx - 16, armY + armH - 3 + armSwing, 7, 3);
       ctx.fillRect(cx + 9, armY + armH - 3 + armSwingB, 7, 3);
@@ -578,69 +597,44 @@ export class BootScene extends Phaser.Scene {
     // ── NECK ─────────────────────────────────────────────────────────────────
     const neckY = torsoY - 7;
     ctx.fillStyle = c.skin;
-    if (isLR) {
-      rrFill(ctx, cx - 3, neckY, 7, 9, 2);
-    } else {
-      rrFill(ctx, cx - 4, neckY, 8, 9, 2);
-    }
-    // Neck shadow
+    if (isLR) { rrFill(ctx, cx - 3, neckY, 7, 9, 2); }
+    else { rrFill(ctx, cx - 4, neckY, 8, 9, 2); }
     ctx.fillStyle = 'rgba(0,0,0,0.1)';
     ctx.fillRect(isLR ? cx - 3 : cx - 4, neckY + 5, isLR ? 7 : 8, 3);
 
     // ── HEAD ──────────────────────────────────────────────────────────────────
     const headCX = cx + (isLR ? facing * 1.5 : 0);
     const headCY = torsoY - 15 + bob * 0.3;
-    const headRX = isLR ? 11 : 13;
+    // Stocky build → slightly wider head; slim → slightly narrower
+    const headRX = (isLR ? 11 : 13) + (buildOff > 0 ? 1 : buildOff < 0 ? -1 : 0);
     const headRY = isLR ? 13 : 14;
 
-    // Head shadow
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
     ctx.beginPath(); ctx.ellipse(headCX + 2, headCY + 2, headRX, headRY, 0, 0, Math.PI * 2); ctx.fill();
-
-    // Head base
     ctx.fillStyle = c.skin;
     ctx.beginPath(); ctx.ellipse(headCX, headCY, headRX, headRY, 0, 0, Math.PI * 2); ctx.fill();
-
-    // Head highlight
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.beginPath(); ctx.ellipse(headCX - headRX * 0.3, headCY - headRY * 0.3, headRX * 0.5, headRY * 0.4, 0, 0, Math.PI * 2); ctx.fill();
 
     // ── HAIR ──────────────────────────────────────────────────────────────────
-    const isBald = false;
-    if (!isBald) {
-      ctx.fillStyle = c.hair;
-      if (isDown) {
-        ctx.beginPath(); ctx.ellipse(headCX, headCY - 6, headRX, 7, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillRect(headCX - headRX, headCY - 6, headRX * 2, 7);
-        if (c.role === 'nurse' || c.isPlayer) {
-          // Bun
-          ctx.beginPath(); ctx.arc(headCX, headCY - 14, 5, 0, Math.PI * 2); ctx.fill();
-        } else if (c.role === 'receptionist') {
-          // Long hair
-          ctx.fillRect(headCX - headRX - 1, headCY, 7, 11);
-          ctx.fillRect(headCX + headRX - 5, headCY, 7, 11);
-        }
-      } else if (isUp) {
-        ctx.beginPath(); ctx.ellipse(headCX, headCY - 5, headRX + 1, 8, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillRect(headCX - headRX - 1, headCY - 5, (headRX + 1) * 2, 14);
-        if (c.role === 'nurse' || c.isPlayer) {
-          ctx.beginPath(); ctx.arc(headCX, headCY - 15, 5, 0, Math.PI * 2); ctx.fill();
-        }
-      } else {
-        // Side profile hair
-        const hdir = facing;
-        ctx.beginPath(); ctx.ellipse(headCX - hdir * 2, headCY - 5, headRX + 2, 8, 0, 0, Math.PI * 2); ctx.fill();
-        ctx.fillRect(headCX - headRX - 1, headCY - 5, (headRX + 2) * 2, 10);
-        if (c.role === 'nurse' || c.isPlayer) {
-          ctx.beginPath(); ctx.arc(headCX - hdir * 2, headCY - 13, 5, 0, Math.PI * 2); ctx.fill();
-        }
-        // Sideburn/ear area
-        ctx.fillRect(headCX + hdir * (headRX - 3), headCY, 4, 8);
+    // Surgical cap overrides all hair
+    if (visual.accessory === 'surgical_cap') {
+      ctx.fillStyle = '#daeeff';
+      ctx.beginPath(); ctx.ellipse(headCX, headCY - 3, headRX + 3, headRY + 2, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(headCX - headRX - 3, headCY - 2, (headRX + 3) * 2, 8);
+      ctx.fillStyle = '#b8d9f5';
+      ctx.fillRect(headCX - headRX - 4, headCY + 3, (headRX + 4) * 2, 4);
+      if (isLR) {
+        ctx.fillStyle = '#b8d9f5';
+        ctx.fillRect(headCX + facing * (headRX + 1), headCY - 1, 5, 3);
       }
+    } else {
+      ctx.fillStyle = c.hair;
+      this.drawHair(ctx, visual.hairStyle, c.hair, headCX, headCY, headRX, headRY, isDown, isUp, isLR, facing);
     }
 
-    // ── NURSE CAP / HAT ───────────────────────────────────────────────────────
-    if ((c.role === 'nurse' || c.isPlayer) && !isUp) {
+    // ── NURSE CAP (player only) ───────────────────────────────────────────────
+    if (visual.nurseCap && !isUp) {
       ctx.fillStyle = '#ffffff';
       rrFill(ctx, headCX - 9, headCY - 18, 18, 6, 1);
       ctx.fillStyle = '#e74c3c';
@@ -652,59 +646,65 @@ export class BootScene extends Phaser.Scene {
       const eyeY = headCY - 1;
       const noseY = headCY + 4;
       const mouthY = headCY + 8;
+      const isFemale = visual.gender === 'female';
+      const isSenior = visual.age === 'senior';
 
       if (isDown) {
         // Eyes
         ctx.fillStyle = '#1a2530';
         ctx.fillRect(headCX - 5.5, eyeY - 1, 4, 4);
         ctx.fillRect(headCX + 1.5, eyeY - 1, 4, 4);
-        // Eye whites
         ctx.fillStyle = '#fff';
         ctx.fillRect(headCX - 5.5, eyeY - 1, 2, 2);
         ctx.fillRect(headCX + 1.5, eyeY - 1, 2, 2);
-        // Pupils
         ctx.fillStyle = '#000';
         ctx.fillRect(headCX - 4, eyeY, 2, 2);
         ctx.fillRect(headCX + 3, eyeY, 2, 2);
         // Eyebrows
         ctx.fillStyle = c.hair;
-        ctx.fillRect(headCX - 6, eyeY - 3, 5, 1.5);
-        ctx.fillRect(headCX + 1, eyeY - 3, 5, 1.5);
+        if (isSenior) {
+          ctx.fillStyle = '#aaaaaa';
+        }
+        ctx.fillRect(headCX - 6, eyeY - 3, 5, isFemale ? 1 : 1.5);
+        ctx.fillRect(headCX + 1, eyeY - 3, 5, isFemale ? 1 : 1.5);
         // Nose
         ctx.fillStyle = darken(c.skin, 0.18);
         ctx.beginPath(); ctx.arc(headCX, noseY, 1.5, 0, Math.PI * 2); ctx.fill();
-        // Blush
-        ctx.fillStyle = 'rgba(220,100,100,0.22)';
-        ctx.beginPath(); ctx.arc(headCX - 6.5, eyeY + 3, 2.5, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(headCX + 6.5, eyeY + 3, 2.5, 0, Math.PI * 2); ctx.fill();
-        // Smile
+        // Blush (female only)
+        if (isFemale) {
+          ctx.fillStyle = 'rgba(220,100,100,0.22)';
+          ctx.beginPath(); ctx.arc(headCX - 6.5, eyeY + 3, 2.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(headCX + 6.5, eyeY + 3, 2.5, 0, Math.PI * 2); ctx.fill();
+        }
+        // Mouth
         ctx.strokeStyle = darken(c.skin, 0.25); ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.arc(headCX, mouthY, 3.5, 0.1, Math.PI - 0.1); ctx.stroke();
+        // Senior wrinkle lines
+        if (isSenior) {
+          ctx.strokeStyle = darken(c.skin, 0.15); ctx.lineWidth = 0.8;
+          ctx.beginPath(); ctx.moveTo(headCX - 7, eyeY + 4); ctx.lineTo(headCX - 4, eyeY + 4); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(headCX + 4, eyeY + 4); ctx.lineTo(headCX + 7, eyeY + 4); ctx.stroke();
+        }
       } else if (isLeft) {
-        // Profile: left side
         ctx.fillStyle = '#1a2530';
         ctx.fillRect(headCX - 7, eyeY - 1, 3.5, 3.5);
         ctx.fillStyle = '#fff';
         ctx.fillRect(headCX - 7, eyeY - 1, 1.5, 1.5);
-        ctx.fillStyle = c.hair;
-        ctx.fillRect(headCX - 8, eyeY - 4, 5, 1.5);
-        // Nose profile
+        ctx.fillStyle = isSenior ? '#aaaaaa' : c.hair;
+        ctx.fillRect(headCX - 8, eyeY - 4, 5, isFemale ? 1 : 1.5);
         ctx.fillStyle = darken(c.skin, 0.22);
         rrFill(ctx, headCX - headRX, noseY - 1, 4, 3, 1);
-        // Ear
         ctx.fillStyle = darken(c.skin, 0.08);
         ctx.beginPath(); ctx.arc(headCX + 7, headCY + 1, 3, 0, Math.PI * 2); ctx.fill();
-        // Mouth
         ctx.strokeStyle = darken(c.skin, 0.25); ctx.lineWidth = 1.2;
         ctx.beginPath(); ctx.arc(headCX - 4, mouthY, 2.5, 0, Math.PI); ctx.stroke();
       } else {
-        // Profile: right side
         ctx.fillStyle = '#1a2530';
         ctx.fillRect(headCX + 3.5, eyeY - 1, 3.5, 3.5);
         ctx.fillStyle = '#fff';
         ctx.fillRect(headCX + 3.5, eyeY - 1, 1.5, 1.5);
-        ctx.fillStyle = c.hair;
-        ctx.fillRect(headCX + 3, eyeY - 4, 5, 1.5);
+        ctx.fillStyle = isSenior ? '#aaaaaa' : c.hair;
+        ctx.fillRect(headCX + 3, eyeY - 4, 5, isFemale ? 1 : 1.5);
         ctx.fillStyle = darken(c.skin, 0.22);
         rrFill(ctx, headCX + headRX - 3, noseY - 1, 4, 3, 1);
         ctx.fillStyle = darken(c.skin, 0.08);
@@ -714,12 +714,409 @@ export class BootScene extends Phaser.Scene {
       }
     }
 
-    // ── GLASSES (doctor / admin) ───────────────────────────────────────────────
-    if ((c.role === 'doctor' || c.role === 'admin') && isDown) {
-      ctx.strokeStyle = '#4a5568'; ctx.lineWidth = 1.5;
-      rrStroke(ctx, headCX - 9, headCY - 3, 7, 5, 2);
-      rrStroke(ctx, headCX + 2, headCY - 3, 7, 5, 2);
-      ctx.beginPath(); ctx.moveTo(headCX - 2, headCY); ctx.lineTo(headCX + 2, headCY); ctx.stroke();
+    // ── GLASSES ───────────────────────────────────────────────────────────────
+    if (visual.accessory === 'glasses' && !isUp) {
+      ctx.strokeStyle = '#3d4f6e'; ctx.lineWidth = 1.5;
+      if (isDown) {
+        rrStroke(ctx, headCX - 9, headCY - 3, 7, 5, 2);
+        rrStroke(ctx, headCX + 2, headCY - 3, 7, 5, 2);
+        ctx.beginPath(); ctx.moveTo(headCX - 2, headCY); ctx.lineTo(headCX + 2, headCY); ctx.stroke();
+      } else if (isLeft) {
+        rrStroke(ctx, headCX - 9, headCY - 3, 7, 5, 2);
+        ctx.beginPath(); ctx.moveTo(headCX - 2, headCY); ctx.lineTo(headCX + 2, headCY); ctx.stroke();
+      } else {
+        rrStroke(ctx, headCX + 2, headCY - 3, 7, 5, 2);
+        ctx.beginPath(); ctx.moveTo(headCX - 2, headCY); ctx.lineTo(headCX + 2, headCY); ctx.stroke();
+      }
+    }
+  }
+
+  // ── 16 UNIQUE HAIR STYLES ─────────────────────────────────────────────────
+  private drawHair(
+    ctx: CanvasRenderingContext2D,
+    style: string,
+    hair: string,
+    hcx: number, hcy: number, hrx: number, hry: number,
+    isDown: boolean, isUp: boolean, isLR: boolean, facing: number,
+  ) {
+    ctx.fillStyle = hair;
+    const isUD = isDown || isUp;
+
+    switch (style) {
+
+      case 'bun': {
+        // Classic bun on top — player style
+        if (isUD) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 6, hrx, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 6, hrx * 2, 7);
+          ctx.beginPath(); ctx.arc(hcx, hcy - hry - 3, 5, 0, Math.PI * 2); ctx.fill();
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 1, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 5, (hrx + 1) * 2, 10);
+          ctx.beginPath(); ctx.arc(hcx - facing * 2, hcy - hry - 2, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx + facing * (hrx - 3), hcy, 4, 7);
+        }
+        break;
+      }
+
+      case 'bob': {
+        // Ana — chin-length bob, side panels
+        if (isDown) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 1, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 5, (hrx + 1) * 2, 12);
+          ctx.fillRect(hcx - hrx - 2, hcy, 5, 12);
+          ctx.fillRect(hcx + hrx - 2, hcy, 5, 12);
+          // Straight bottom edge
+          ctx.fillRect(hcx - hrx - 2, hcy + 9, (hrx + 2) * 2, 3);
+        } else if (isUp) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 1, 8, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 5, (hrx + 1) * 2, 14);
+          ctx.fillRect(hcx - hrx - 2, hcy, 5, 10);
+          ctx.fillRect(hcx + hrx - 2, hcy, 5, 10);
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 2, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 5, (hrx + 2) * 2, 12);
+          const backX = facing > 0 ? hcx - hrx - 4 : hcx + hrx;
+          ctx.fillRect(backX, hcy, 6, 12);
+          ctx.fillRect(hcx + facing * (hrx - 2), hcy, 4, 5);
+        }
+        break;
+      }
+
+      case 'low_fade': {
+        // Carlos — very short sides, slight flat top
+        if (isUD) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 8, hrx - 1, 4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx + 1, hcy - 8, (hrx - 1) * 2, 5);
+          ctx.globalAlpha = 0.45;
+          ctx.fillRect(hcx - hrx - 1, hcy - 1, 3, 5);
+          ctx.fillRect(hcx + hrx - 2, hcy - 1, 3, 5);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 7, hrx - 1, 4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx + 1, hcy - 7, hrx * 2, 5);
+          ctx.globalAlpha = 0.45;
+          ctx.fillRect(hcx + facing * (hrx - 1), hcy - 1, 3, 4);
+          ctx.globalAlpha = 1;
+        }
+        break;
+      }
+
+      case 'curly_top': {
+        // João — pile of curls on top
+        const curl = (cx2: number, cy2: number, r: number) => {
+          ctx.beginPath(); ctx.arc(cx2, cy2, r, 0, Math.PI * 2); ctx.fill();
+        };
+        if (isUD) {
+          curl(hcx - 6, hcy - hry, 5);
+          curl(hcx + 4, hcy - hry - 1, 5);
+          curl(hcx - 1, hcy - hry - 3, 4);
+          curl(hcx + 8, hcy - hry + 2, 4);
+          curl(hcx - 8, hcy - hry + 2, 4);
+          ctx.fillRect(hcx - hrx + 2, hcy - hry, hrx * 2 - 3, 7);
+          ctx.globalAlpha = 0.4;
+          ctx.fillRect(hcx - hrx, hcy, 4, 3);
+          ctx.fillRect(hcx + hrx - 3, hcy, 4, 3);
+          ctx.globalAlpha = 1;
+        } else {
+          curl(hcx - facing, hcy - hry - 2, 5);
+          curl(hcx - facing * 4, hcy - hry, 4);
+          curl(hcx + facing * 3, hcy - hry, 4);
+          ctx.fillRect(hcx - hrx, hcy - hry, hrx * 2, 5);
+          ctx.globalAlpha = 0.45;
+          ctx.fillRect(hcx + facing * (hrx - 2), hcy, 3, 3);
+          ctx.globalAlpha = 1;
+        }
+        break;
+      }
+
+      case 'ponytail': {
+        // Renata — hair cap + ponytail at the back/nape
+        if (isDown) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 6, hrx, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 6, hrx * 2, 7);
+          ctx.globalAlpha = 0.6;
+          ctx.fillRect(hcx - 3, hcy + 1, 6, 14);
+          ctx.globalAlpha = 1;
+        } else if (isUp) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 6, hrx, 8, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 6, hrx * 2, 14);
+          ctx.fillRect(hcx - 4, hcy + 3, 8, 18);
+          ctx.fillRect(hcx - 3, hcy + 18, 6, 7);
+          ctx.fillStyle = '#2c2c2c';
+          ctx.fillRect(hcx - 4, hcy + 3, 8, 3);
+          ctx.fillStyle = hair;
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx - facing, hcy - 5, hrx + 1, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 5, (hrx + 1) * 2, 10);
+          const tailX = facing > 0 ? hcx - hrx - 3 : hcx + hrx - 2;
+          ctx.fillRect(tailX, hcy, 5, 17);
+          ctx.fillRect(tailX + 1, hcy + 14, 3, 7);
+          ctx.fillStyle = '#2c2c2c';
+          ctx.fillRect(tailX, hcy, 5, 3);
+          ctx.fillStyle = hair;
+          ctx.fillRect(hcx + facing * (hrx - 3), hcy, 4, 5);
+        }
+        break;
+      }
+
+      case 'receding': {
+        // Farias — receding hairline, thin sides and back, bald crown
+        if (isDown) {
+          ctx.globalAlpha = 0.65;
+          ctx.fillRect(hcx - hrx - 1, hcy - 3, 5, 7);
+          ctx.fillRect(hcx + hrx - 3, hcy - 3, 5, 7);
+          ctx.globalAlpha = 1;
+          ctx.fillRect(hcx - hrx + 2, hcy - hry + 1, 6, 3);
+          ctx.fillRect(hcx + hrx - 7, hcy - hry + 1, 6, 3);
+        } else if (isUp) {
+          ctx.fillRect(hcx - hrx, hcy - 6, hrx * 2, 14);
+          ctx.fillRect(hcx - hrx - 1, hcy - 3, 5, 8);
+          ctx.fillRect(hcx + hrx - 3, hcy - 3, 5, 8);
+        } else {
+          const backX = facing > 0 ? hcx - hrx - 2 : hcx + hrx - 2;
+          ctx.fillRect(backX, hcy - 3, 5, 11);
+          ctx.globalAlpha = 0.6;
+          ctx.fillRect(backX, hcy - 7, 5, 4);
+          ctx.globalAlpha = 1;
+          ctx.fillRect(hcx - hrx + 1, hcy - hry + 1, hrx * 2 - 2, 2);
+        }
+        break;
+      }
+
+      case 'updo': {
+        // Diretora — formal updo, hair piled high
+        if (isUD) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 6, hrx, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 6, hrx * 2, 7);
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - hry - 5, 9, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(hcx - 5, hcy - hry - 3, 5, 4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(hcx + 5, hcy - hry - 3, 5, 4, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = 'rgba(255,255,255,0.13)';
+          ctx.beginPath(); ctx.ellipse(hcx - 2, hcy - hry - 6, 4, 3, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = hair;
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 1, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 5, (hrx + 1) * 2, 10);
+          ctx.beginPath(); ctx.ellipse(hcx - facing * 2, hcy - hry - 4, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx + facing * (hrx - 2), hcy, 3, 6);
+        }
+        break;
+      }
+
+      case 'afro_short': {
+        // Rosa — rounded short afro, wider than head
+        const ar = hrx + 4;
+        if (isUD) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 3, ar, hry + 3, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = darken(hair, 0.18);
+          for (let i = 0; i < 6; i++) {
+            const ax = hcx + (i % 3 - 1) * 8;
+            const ay = hcy - 5 + (i < 3 ? 0 : -7);
+            ctx.beginPath(); ctx.arc(ax, ay, 1.5, 0, Math.PI * 2); ctx.fill();
+          }
+          ctx.fillStyle = hair;
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 3, ar, hry + 3, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = darken(hair, 0.18);
+          ctx.beginPath(); ctx.arc(hcx - facing * 5, hcy - 6, 2, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.arc(hcx + facing * 2, hcy - 10, 2, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = hair;
+        }
+        break;
+      }
+
+      case 'loose_long': {
+        // Clara — long loose hair past shoulders
+        if (isDown) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 2, 8, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 2, hcy - 5, (hrx + 2) * 2, 28);
+          ctx.fillRect(hcx - hrx - 3, hcy, 6, 22);
+          ctx.fillRect(hcx + hrx - 2, hcy, 6, 22);
+        } else if (isUp) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 2, 8, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 2, hcy - 5, (hrx + 2) * 2, 28);
+          ctx.fillRect(hcx - hrx - 3, hcy, 6, 20);
+          ctx.fillRect(hcx + hrx - 2, hcy, 6, 20);
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 3, 8, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 2, hcy - 5, (hrx + 3) * 2, 12);
+          const backX = facing > 0 ? hcx - hrx - 5 : hcx + hrx - 1;
+          ctx.fillRect(backX, hcy, 7, 24);
+          ctx.fillRect(backX, hcy + 21, 5, 8);
+          const frontX = facing > 0 ? hcx + hrx - 3 : hcx - hrx - 3;
+          ctx.fillRect(frontX, hcy, 5, 18);
+          ctx.fillRect(hcx + facing * (hrx - 1), hcy, 3, 8);
+        }
+        break;
+      }
+
+      case 'high_pony': {
+        // Maria — high ponytail gathered at top
+        if (isDown) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 5, hrx * 2, 8);
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - hry - 2, 4, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - 3, hcy - hry + 3, 6, 10);
+          ctx.fillStyle = '#2c2c2c';
+          ctx.fillRect(hcx - 4, hcy - hry - 2, 8, 3);
+          ctx.fillStyle = hair;
+        } else if (isUp) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 5, hrx * 2, 14);
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - hry, 4, 9, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#2c2c2c';
+          ctx.fillRect(hcx - 4, hcy - hry, 8, 3);
+          ctx.fillStyle = hair;
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 1, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 5, (hrx + 1) * 2, 8);
+          ctx.fillRect(hcx + facing * (hrx - 3), hcy, 4, 6);
+          ctx.beginPath(); ctx.ellipse(hcx - facing * 2, hcy - hry - 2, 4, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - facing * 4, hcy - hry + 3, 5, 12);
+          ctx.fillRect(hcx - facing * 5, hcy - hry + 13, 4, 7);
+          ctx.fillStyle = '#2c2c2c';
+          ctx.fillRect(hcx - facing * 5, hcy - hry - 3, 8, 3);
+          ctx.fillStyle = hair;
+        }
+        break;
+      }
+
+      case 'business': {
+        // Dr. Oliveira — side-parted professional male
+        if (isDown) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 7, hrx, 6, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 7, hrx * 2, 6);
+          ctx.fillStyle = 'rgba(0,0,0,0.07)';
+          ctx.fillRect(hcx - 2, hcy - hry, 2, 6);
+          ctx.fillStyle = hair;
+        } else if (isUp) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 6, hrx, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 6, hrx * 2, 10);
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx - facing, hcy - 7, hrx, 6, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 7, hrx * 2 + 2, 6);
+          const sweptX = facing > 0 ? hcx + hrx - 4 : hcx - hrx;
+          ctx.fillRect(sweptX, hcy - 5, 4, 4);
+          ctx.globalAlpha = 0.5;
+          ctx.fillRect(hcx + facing * (hrx - 1), hcy, 3, 3);
+          ctx.globalAlpha = 1;
+        }
+        break;
+      }
+
+      case 'long_tied': {
+        // Dra. Santos — long hair pulled back, low bun at nape
+        if (isDown) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 6, hrx + 1, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 6, (hrx + 1) * 2, 8);
+          ctx.fillRect(hcx - hrx - 2, hcy, 4, 6);
+          ctx.fillRect(hcx + hrx - 1, hcy, 4, 6);
+          ctx.beginPath(); ctx.arc(hcx, hcy + 7, 5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#1a1a1a';
+          ctx.fillRect(hcx - 5, hcy + 6, 10, 2);
+          ctx.fillStyle = hair;
+        } else if (isUp) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 5, hrx + 1, 8, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 5, (hrx + 1) * 2, 14);
+          ctx.beginPath(); ctx.ellipse(hcx, hcy + 7, 6, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#1a1a1a';
+          ctx.fillRect(hcx - 6, hcy + 5, 12, 2);
+          ctx.fillStyle = hair;
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx - facing, hcy - 5, hrx + 1, 7, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx - 1, hcy - 5, (hrx + 1) * 2, 10);
+          ctx.fillRect(hcx + facing * (hrx - 2), hcy, 4, 6);
+          const bunX = facing > 0 ? hcx - hrx - 3 : hcx + hrx - 2;
+          ctx.beginPath(); ctx.ellipse(bunX + 3, hcy + 6, 5, 5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#1a1a1a';
+          ctx.fillRect(bunX, hcy + 4, 6, 2);
+          ctx.fillStyle = hair;
+        }
+        break;
+      }
+
+      case 'short_wavy': {
+        // Pedro — short with slight wave texture
+        if (isUD) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 7, hrx, 5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 7, hrx * 2, 6);
+          ctx.fillStyle = darken(hair, 0.15);
+          ctx.fillRect(hcx - 5, hcy - 9, 4, 2);
+          ctx.fillRect(hcx + 1, hcy - 10, 4, 2);
+          ctx.fillRect(hcx - 2, hcy - 8, 3, 2);
+          ctx.fillStyle = hair;
+          ctx.globalAlpha = 0.55;
+          ctx.fillRect(hcx - hrx - 1, hcy, 4, 3);
+          ctx.fillRect(hcx + hrx - 2, hcy, 4, 3);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 7, hrx, 5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx, hcy - 7, hrx * 2, 6);
+          ctx.fillStyle = darken(hair, 0.15);
+          ctx.fillRect(hcx - facing * 3, hcy - 9, 4, 2);
+          ctx.fillStyle = hair;
+          ctx.globalAlpha = 0.55;
+          ctx.fillRect(hcx + facing * (hrx - 2), hcy, 3, 3);
+          ctx.globalAlpha = 1;
+        }
+        break;
+      }
+
+      case 'bald': {
+        // Sr. João — completely bald
+        // No hair drawn at all; ear will be shown by face section
+        break;
+      }
+
+      case 'short_curly_gray': {
+        // Dona Maria — short tight curls, elderly
+        const tc = (cx3: number, cy3: number, r3: number) => {
+          ctx.beginPath(); ctx.arc(cx3, cy3, r3, 0, Math.PI * 2); ctx.fill();
+        };
+        if (isUD) {
+          tc(hcx - 7, hcy - hry + 1, 4);
+          tc(hcx, hcy - hry - 1, 4);
+          tc(hcx + 7, hcy - hry + 1, 4);
+          tc(hcx - 4, hcy - hry - 3, 3);
+          tc(hcx + 4, hcy - hry - 3, 3);
+          ctx.fillRect(hcx - hrx + 2, hcy - hry + 1, (hrx - 2) * 2, 4);
+          ctx.globalAlpha = 0.55;
+          ctx.fillRect(hcx - hrx, hcy, 5, 4);
+          ctx.fillRect(hcx + hrx - 4, hcy, 5, 4);
+          ctx.globalAlpha = 1;
+        } else {
+          tc(hcx - facing * 2, hcy - hry, 4);
+          tc(hcx - facing * 6, hcy - hry + 2, 3);
+          tc(hcx + facing * 3, hcy - hry + 1, 3);
+          ctx.fillRect(hcx - hrx + 1, hcy - hry + 1, hrx * 2 - 2, 4);
+          ctx.globalAlpha = 0.55;
+          ctx.fillRect(hcx + facing * (hrx - 3), hcy, 4, 4);
+          ctx.globalAlpha = 1;
+        }
+        break;
+      }
+
+      case 'short_neat':
+      default: {
+        // Roberto — clean short male cut
+        if (isUD) {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 7, hrx - 1, 5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx + 1, hcy - 7, (hrx - 1) * 2, 5);
+          ctx.globalAlpha = 0.45;
+          ctx.fillRect(hcx - hrx, hcy - 2, 4, 3);
+          ctx.fillRect(hcx + hrx - 3, hcy - 2, 4, 3);
+          ctx.globalAlpha = 1;
+        } else {
+          ctx.beginPath(); ctx.ellipse(hcx, hcy - 7, hrx - 1, 5, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(hcx - hrx + 1, hcy - 7, (hrx - 1) * 2, 5);
+          ctx.globalAlpha = 0.45;
+          ctx.fillRect(hcx + facing * (hrx - 2), hcy - 2, 3, 3);
+          ctx.globalAlpha = 1;
+        }
+        break;
+      }
+
     }
   }
 
