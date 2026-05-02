@@ -395,13 +395,13 @@ export class BootScene extends Phaser.Scene {
     const tilt = moving && isLR ? Math.sin(phase) * 0.5 : 0;
     const cx = x + SPR_W / 2;
 
-    // Build-based width adjustments
-    const buildOff = visual.build === 'slim' ? -2 : visual.build === 'stocky' ? 3 : 0;
-    const legW1 = 7 + (buildOff > 0 ? 2 : 0);
-    const legW2 = 8 + (buildOff > 0 ? 2 : 0);
+    // Build-based width adjustments (kept subtle so nobody looks like a blob)
+    const buildOff = visual.build === 'slim' ? -1 : visual.build === 'stocky' ? 2 : 0;
+    const legW1 = 6 + (buildOff > 0 ? 1 : 0);
+    const legW2 = 7 + (buildOff > 0 ? 1 : 0);
 
     // Height adjustment via groundY offset
-    const groundY = 72 + visual.groundYOff;
+    const groundY = 68 + visual.groundYOff;
     const bodyBase = groundY + bob;
 
     // ── SHADOW ──────────────────────────────────────────────────────────────
@@ -441,20 +441,25 @@ export class BootScene extends Phaser.Scene {
       ctx.fillStyle = darken(c.pants, -0.15);
       ctx.fillRect(fLegX + 1, bodyBase - 18, 4, 3);
     } else {
+      // Front/back view: legs aligned under the (narrower) torso
+      const lw = 6 + buildOff;
+      const legGap = 2;
+      const leftLegX = cx - lw - legGap / 2;
+      const rightLegX = cx + legGap / 2;
       ctx.fillStyle = c.pants;
       const leftLegY = bodyBase - 22 + (moving ? stride * 0.5 : 0);
       const rightLegY = bodyBase - 22 + (moving ? strideB * 0.5 : 0);
-      rrFill(ctx, cx - 12, leftLegY, 8 + buildOff, 22, 3);
-      rrFill(ctx, cx + 3 + buildOff, rightLegY, 8 + buildOff, 22, 3);
+      rrFill(ctx, leftLegX, leftLegY, lw, 22, 3);
+      rrFill(ctx, rightLegX, rightLegY, lw, 22, 3);
       ctx.fillStyle = darken(c.pants, 0.2);
-      ctx.fillRect(cx - 3, leftLegY + 14, 2, 8);
-      ctx.fillRect(cx + 10 + buildOff, rightLegY + 14, 2, 8);
+      ctx.fillRect(leftLegX + lw - 2, leftLegY + 12, 2, 8);
+      ctx.fillRect(rightLegX, rightLegY + 12, 2, 8);
     }
 
     // ── TORSO / UNIFORM TOP ───────────────────────────────────────────────────
-    const torsoY = bodyBase - 44 + bob * 0.4;
-    const torsoW = (isLR ? 20 : 23) + buildOff;
-    const torsoH = 22;
+    const torsoY = bodyBase - 40 + bob * 0.4;
+    const torsoW = (isLR ? 14 : 17) + buildOff;
+    const torsoH = 20;
     const torsoX = cx - torsoW / 2;
 
     if (tilt !== 0 && isLR) {
@@ -561,37 +566,39 @@ export class BootScene extends Phaser.Scene {
 
     // ── ARMS ──────────────────────────────────────────────────────────────────
     const armY = torsoY + 2;
-    const armH = 18;
+    const armH = 16;
+    const armW = 5;
     if (isLR) {
-      const backArmX = facing > 0 ? torsoX - 5 : torsoX + torsoW - 1;
+      const backArmX = facing > 0 ? torsoX - 4 : torsoX + torsoW;
       ctx.fillStyle = darken(c.role === 'doctor' ? '#ffffff' : c.coat, 0.25);
-      rrFill(ctx, backArmX, armY + armSwingB, 7, armH, 3);
-      const frontArmX = facing > 0 ? torsoX + torsoW - 2 : torsoX - 6;
+      rrFill(ctx, backArmX, armY + armSwingB, armW, armH, 2);
+      const frontArmX = facing > 0 ? torsoX + torsoW - 1 : torsoX - armW;
       ctx.fillStyle = c.role === 'doctor' ? '#f0f0f0' : c.coat;
-      rrFill(ctx, frontArmX, armY + armSwing, 7, armH, 3);
+      rrFill(ctx, frontArmX, armY + armSwing, armW, armH, 2);
     } else {
       ctx.fillStyle = c.role === 'doctor' ? '#f0f0f0' : c.coat;
-      rrFill(ctx, cx - 16, armY + armSwing, 7, armH, 3);
-      rrFill(ctx, cx + 9, armY + armSwingB, 7, armH, 3);
+      rrFill(ctx, cx - torsoW / 2 - armW, armY + armSwing, armW, armH, 2);
+      rrFill(ctx, cx + torsoW / 2, armY + armSwingB, armW, armH, 2);
       ctx.fillStyle = 'rgba(0,0,0,0.1)';
-      ctx.fillRect(cx - 16, armY + armH - 3 + armSwing, 7, 3);
-      ctx.fillRect(cx + 9, armY + armH - 3 + armSwingB, 7, 3);
+      ctx.fillRect(cx - torsoW / 2 - armW, armY + armH - 3 + armSwing, armW, 3);
+      ctx.fillRect(cx + torsoW / 2, armY + armH - 3 + armSwingB, armW, 3);
     }
 
     // ── HANDS ─────────────────────────────────────────────────────────────────
     ctx.fillStyle = c.skin;
+    const handR = 3.5;
     if (isLR) {
-      const fhY = armY + armH + armSwing - 1;
-      const bhY = armY + armH + armSwingB - 1;
-      const fhX = facing > 0 ? torsoX + torsoW - 1 : torsoX - 4;
-      const bhX = facing > 0 ? torsoX - 3 : torsoX + torsoW - 3;
-      ctx.globalAlpha = 0.75;
-      ctx.beginPath(); ctx.arc(bhX + 3.5, bhY + 4, 4, 0, Math.PI * 2); ctx.fill();
+      const fhY = armY + armH + armSwing + 1;
+      const bhY = armY + armH + armSwingB + 1;
+      const fhX = facing > 0 ? torsoX + torsoW + armW / 2 - 1 : torsoX - armW / 2;
+      const bhX = facing > 0 ? torsoX - armW / 2 : torsoX + torsoW + armW / 2 - 1;
+      ctx.globalAlpha = 0.7;
+      ctx.beginPath(); ctx.arc(bhX, bhY, handR, 0, Math.PI * 2); ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.beginPath(); ctx.arc(fhX + 3.5, fhY + 4, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(fhX, fhY, handR, 0, Math.PI * 2); ctx.fill();
     } else {
-      ctx.beginPath(); ctx.arc(cx - 12, armY + armH + armSwing + 3, 4.5, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(cx + 13, armY + armH + armSwingB + 3, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx - torsoW / 2 - armW / 2, armY + armH + armSwing + 3, handR, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(cx + torsoW / 2 + armW / 2, armY + armH + armSwingB + 3, handR, 0, Math.PI * 2); ctx.fill();
     }
 
     // ── NECK ─────────────────────────────────────────────────────────────────

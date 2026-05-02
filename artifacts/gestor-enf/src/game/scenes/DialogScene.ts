@@ -240,68 +240,97 @@ export class DialogScene extends Phaser.Scene {
     this.cursor.setVisible(false);
 
     const choices = this.dialogue.choices;
-    const choiceY = BOX_Y - 16;
-    const btnH = 52;
-    const gap = 8;
+    // Fixed full-width panel, vertically stacked above the dialogue box
+    const btnW = GAME_WIDTH - 80;
+    const btnH = 48;
+    const gap = 6;
+    const totalH = choices.length * (btnH + gap) - gap;
+    // Anchor bottom of the stack just above the dialogue box
+    const stackBottom = BOX_Y - 20;
+    const stackTop = stackBottom - totalH;
+
+    // Semi-transparent backdrop behind all choices
+    const backdrop = this.add.graphics();
+    backdrop.fillStyle(0x000000, 0.38);
+    backdrop.fillRoundedRect(40 - 8, stackTop - 10, btnW + 16, totalH + 20, 12);
+    this.choiceArea.add(backdrop);
 
     choices.forEach((choice, i) => {
-      const btnW = (GAME_WIDTH - 80) / choices.length - gap;
-      const bx = 40 + i * (btnW + gap) + btnW / 2;
-      const by = choiceY - i * 0;
-      const cy = choiceY - (choices.length - 1 - i) * (btnH + gap);
+      const cx = GAME_WIDTH / 2;
+      const cy = stackTop + i * (btnH + gap) + btnH / 2;
 
-      const cont = this.add.container(bx, cy);
+      const cont = this.add.container(cx, cy + 20);
+
+      const redrawBtn = (hover: boolean) => {
+        btnBg.clear();
+        btnBg.fillStyle(hover ? 0x1a3a5c : 0x0d1f35, 1);
+        btnBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
+        btnBg.lineStyle(hover ? 2.5 : 1.5, hover ? 0xf1c40f : 0x1abc9c, 1);
+        btnBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 8);
+        // Left accent bar
+        if (hover) {
+          btnBg.fillStyle(0xf1c40f, 1);
+          btnBg.fillRoundedRect(-btnW / 2, -btnH / 2 + 4, 4, btnH - 8, 2);
+        } else {
+          btnBg.fillStyle(0x1abc9c, 0.8);
+          btnBg.fillRoundedRect(-btnW / 2, -btnH / 2 + 4, 3, btnH - 8, 2);
+        }
+      };
 
       const btnBg = this.add.graphics();
-      btnBg.fillStyle(0x0d1f35, 1);
-      btnBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
-      btnBg.lineStyle(2, 0x1abc9c, 1);
-      btnBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
+      redrawBtn(false);
 
-      const numTxt = this.add.text(-btnW / 2 + 14, 0, `${i + 1}.`, {
-        fontFamily: "'Press Start 2P', monospace", fontSize: '10px', color: '#f39c12',
-      }).setOrigin(0, 0.5);
+      // Number badge
+      const badgeSize = 22;
+      const badgeBg = this.add.graphics();
+      badgeBg.fillStyle(0x1abc9c, 1);
+      badgeBg.fillRoundedRect(-btnW / 2 + 12, -badgeSize / 2, badgeSize, badgeSize, 4);
 
-      const choiceTxt = this.add.text(-btnW / 2 + 36, 0, choice.text, {
+      const numTxt = this.add.text(-btnW / 2 + 12 + badgeSize / 2, 0, `${i + 1}`, {
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: '9px',
+        color: '#0d1f35',
+      }).setOrigin(0.5, 0.5);
+
+      const choiceTxt = this.add.text(-btnW / 2 + 46, 0, choice.text, {
         fontFamily: "'VT323', monospace",
-        fontSize: '21px',
+        fontSize: '24px',
         color: '#ecf0f1',
-        wordWrap: { width: btnW - 50 },
+        wordWrap: { width: btnW - 60 },
       }).setOrigin(0, 0.5);
 
-      // Tooltip
-      if (choice.tooltip) {
-        const tip = this.add.text(btnW / 2 - 12, -btnH / 2 + 8, `💡 ${choice.tooltip}`, {
-          fontFamily: 'monospace', fontSize: '8px', color: '#7f8c8d',
-          wordWrap: { width: btnW / 2 },
-        }).setOrigin(1, 0);
-      }
+      // Keyboard shortcut hint (right side)
+      const keyHint = this.add.text(btnW / 2 - 12, 0, `[${i + 1}]`, {
+        fontFamily: 'monospace', fontSize: '10px', color: '#445566',
+      }).setOrigin(1, 0.5);
 
       const zone = this.add.zone(-btnW / 2, -btnH / 2, btnW, btnH).setOrigin(0).setInteractive({ cursor: 'pointer' });
 
       zone.on('pointerover', () => {
         playSound('hover');
-        btnBg.clear();
-        btnBg.fillStyle(0x1e3a5f, 1);
-        btnBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
-        btnBg.lineStyle(3, 0xf1c40f, 1);
-        btnBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
+        redrawBtn(true);
+        badgeBg.clear();
+        badgeBg.fillStyle(0xf1c40f, 1);
+        badgeBg.fillRoundedRect(-btnW / 2 + 12, -badgeSize / 2, badgeSize, badgeSize, 4);
+        numTxt.setColor('#0d1f35');
         choiceTxt.setColor('#ffffff');
+        keyHint.setColor('#f1c40f');
       });
       zone.on('pointerout', () => {
-        btnBg.clear();
-        btnBg.fillStyle(0x0d1f35, 1);
-        btnBg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
-        btnBg.lineStyle(2, 0x1abc9c, 1);
-        btnBg.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 10);
+        redrawBtn(false);
+        badgeBg.clear();
+        badgeBg.fillStyle(0x1abc9c, 1);
+        badgeBg.fillRoundedRect(-btnW / 2 + 12, -badgeSize / 2, badgeSize, badgeSize, 4);
+        numTxt.setColor('#0d1f35');
         choiceTxt.setColor('#ecf0f1');
+        keyHint.setColor('#445566');
       });
       zone.on('pointerdown', () => { playSound('click'); this.selectChoice(i); });
       this.input.keyboard?.once(`keydown-${i + 1}`, () => { playSound('click'); this.selectChoice(i); });
 
-      cont.add([btnBg, numTxt, choiceTxt, zone]);
-      cont.setAlpha(0).setY(cy + 16);
-      this.tweens.add({ targets: cont, alpha: 1, y: cy, duration: 200, delay: i * 70, ease: 'Back.easeOut' });
+      cont.add([btnBg, badgeBg, numTxt, choiceTxt, keyHint, zone]);
+      cont.setAlpha(0);
+      this.tweens.add({ targets: cont, alpha: 1, y: cy, duration: 180, delay: i * 55, ease: 'Back.easeOut' });
 
       this.choiceArea.add(cont);
       this.choiceButtons.push(cont);

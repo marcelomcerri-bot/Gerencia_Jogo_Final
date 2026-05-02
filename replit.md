@@ -1,5 +1,11 @@
 # Gestor ENF - Nursing Management Educational RPG
 
+## Recent Changes (May 2026)
+- **Dialogue choices**: Completely redesigned from a scattered diagonal layout to a clean full-width vertical stack above the dialogue box. Includes backdrop, numbered badge with teal accent, keyboard shortcuts `[1]`-`[4]`, and yellow highlight on hover.
+- **Character sprites**: Slimmed down significantly — torso reduced from 23px→17px (front) and 20px→14px (side), arms from 7px→5px, groundY lowered from 72→68. All proportions are more pixel-art appropriate. Physics body offsets updated to match (setOffset(15,61)).
+- **16 unique NPC hair styles + visual profiles**: CharVisual interface with build/height/gender/age/accessory per character, drawHair() method with 16 named styles.
+- **Game start fix**: MenuScene exposes `window.triggerStartGame`, App.tsx calls it as primary path.
+
 ## Overview
 
 An interactive 2D RPG educational game focused on nursing management in real healthcare scenarios (HUAP/UFF). Players make managerial decisions across categories like leadership, HR, quality, ethics, and finance.
