@@ -1,0 +1,26 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "ATo2gJbPQT9p3NFvoHd-z"
+uri = "file://artifacts/gestor-enf/public/assets/portrait_nurse_f.png"
+type = "image"
+title = "nurse female portrait"
+
+[[generated]]
+id = "XolNyBvl_4olBdYSa1wcy"
+uri = "file://artifacts/gestor-enf/public/assets/portrait_doctor_m.png"
+type = "image"
+title = "doctor male portrait"
+
+[[generated]]
+id = "T6ttr6RDzdQImThzXVxuN"
+uri = "file://artifacts/gestor-enf/public/assets/portrait_admin_f.png"
+type = "image"
+title = "admin female portrait"
+
+[[generated]]
+id = "gpq6sBW30icfoSrlzuqga"
+uri = "file://artifacts/gestor-enf/public/assets/portrait_receptionist.png"
+type = "image"
+title = "receptionist portrait"

@@ -1,0 +1,138 @@
+Crie TODOS os assets do jogo em pixel art premium no estilo de jogos indie profissionais modernos, inspirado em Stardew Valley, Project Hospital e pixel art hospitalar HD-2D, mantendo consistência visual absoluta entre cenário, personagens, objetos e interface, o mais importante também é substituir esses sprites externos, faça do jeito que eu te ensinar abaixo.
+IMPORTANTE:
+NÃO gerar pixel art genérica, borrada, infantil ou simplificada.
+NÃO usar estilo mobile barato.
+NÃO usar outline preto pesado.
+NÃO usar cores saturadas demais.
+NÃO criar sprites deformados.
+NÃO misturar estilos diferentes.
+O visual deve parecer um jogo indie comercial feito por um estúdio profissional.
+ESTILO VISUAL:
+• pixel art limpa e refinada
+• iluminação suave e cinematográfica
+• sombras delicadas
+• paleta hospitalar elegante
+• tons branco quente, teal hospitalar, cinza claro e azul esverdeado
+• profundidade visual
+• detalhes pequenos nos objetos
+• sensação acolhedora e humana
+• ambiente hospitalar moderno e organizado
+• estética emocional e confortável
+• acabamento polido
+• perspectiva top-down levemente inclinada
+• textura rica mas limpa
+• sensação de hospital vivo
+TEXTURAS DO HOSPITAL:
+Criar tilesets completos em pixel art premium contendo:
+PISOS:
+• piso hospitalar claro brilhante
+• piso acetinado
+• piso frio levemente refletivo
+• piso de UTI
+• piso de corredor
+• piso administrativo
+• piso infantil
+• piso de oncologia
+• pisos com pequenas variações naturais
+• juntas suaves entre tiles
+PAREDES:
+• paredes hospitalares modernas
+• divisórias médicas
+• detalhes metálicos suaves
+• acabamentos elegantes
+• painéis hospitalares
+• paredes com iluminação indireta
+OBJETOS:
+• camas hospitalares premium
+• monitores cardíacos animáveis
+• bombas de infusão
+• suportes de soro
+• cortinas divisórias
+• balcão de recepção
+• computadores hospitalares
+• armários médicos
+• gaveteiros
+• cadeira de rodas
+• macas
+• bancos
+• poltronas de acompanhante
+• plantas decorativas
+• bebedouros
+• quadros motivacionais
+• portas automáticas hospitalares
+• iluminação de teto
+• placas de setor
+• lixeiras hospitalares
+• carrinhos de medicação
+• medicamentos
+• prontuários
+• aparelhos médicos detalhados
+AMBIENTAÇÃO:
+Adicionar sensação de profundidade e vida:
+• pequenas luzes suaves
+• reflexos discretos
+• sombras abaixo dos objetos
+• brilho leve no piso
+• pequenas imperfeições naturais
+• variações sutis entre tiles
+• detalhes hospitalares realistas
+PERSONAGENS:
+Criar sprites extremamente refinados em pixel art profissional.
+ESTILO DOS PERSONAGENS:
+• proporção semelhante a Stardew Valley moderno
+• animação fluida
+• movimento natural
+• cabeça proporcional
+• roupas detalhadas
+• cabelo com volume
+• sombra suave
+• expressão simples mas humana
+• qualidade indie premium
+CRIAR:
+• médicos homens
+• médicas
+• enfermeiros
+• enfermeiras
+• técnicos de enfermagem
+• fisioterapeutas
+• recepcionistas
+• faxineiros
+• pacientes adultos
+• pacientes idosos
+• crianças
+• acompanhantes
+• pacientes em quimioterapia
+• pacientes debilitados
+• personagens negros
+• personagens brancos
+• diversidade visual realista
+ROUPAS:
+• jalecos
+• scrubs hospitalares
+• crachás
+• estetoscópios
+• máscaras
+• luvas
+• roupas casuais
+• uniformes administrativos
+ANIMAÇÕES:
+Criar sprite sheets completas com:
+• andando para frente
+• andando para trás
+• andando de lado
+• idle
+• pequenas variações naturais de movimento
+• animação fluida
+• braços e pernas sincronizados
+• movimento natural do cabelo e roupa
+QUALIDADE:
+Tudo deve parecer parte do MESMO jogo.
+Manter:
+• mesma paleta
+• mesma iluminação
+• mesma escala
+• mesma densidade de detalhes
+• mesmo estilo artístico
+RESULTADO FINAL:
+O jogo deve parecer um indie hospitalar premium da Steam, emocional, bonito, moderno e extremamente polido.
+

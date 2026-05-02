@@ -7,10 +7,9 @@ const SPR_H = 128;
 const FRAMES = 24; // 6 frames × 4 directions (down, up, right, left)
 
 // Size at which the sprite is drawn inside the 44×128 canvas.
-// Keeps the physics body offsets (feet at y≈110) unchanged while
-// making the visual character the same size as the old programmatic sprites.
-const DRAW_W = 34;  // visual width (centered in 44px canvas → 5px padding each side)
-const DRAW_H = 56;  // visual height (top-anchored, matches ~old groundY=54)
+// groundY=72 → DRAW_H must be ≥72 so feet from the sheet align with the physics body (offset 65).
+const DRAW_W = 40;  // visual width (centered in 44px canvas → 2px padding each side)
+const DRAW_H = 76;  // visual height — feet of source image land at ≈y=76, physics body offset=65
 const DRAW_X_OFF = Math.round((SPR_W - DRAW_W) / 2); // horizontal centering offset
 
 // New sprite sheet pixel coordinates (measured from 1704×923 source image)
@@ -92,6 +91,10 @@ export class BootScene extends Phaser.Scene {
     this.load.image('huap_photo', `${base}assets/huap.png`);
     this.load.image('huap_pixelart', `${base}assets/huap_pixelart.png`);
     this.load.image('nurses_sprite', `${base}assets/nurses_sprite.png`);
+    this.load.image('portrait_img_nurse', `${base}assets/portrait_nurse_f.png`);
+    this.load.image('portrait_img_doctor', `${base}assets/portrait_doctor_m.png`);
+    this.load.image('portrait_img_admin', `${base}assets/portrait_admin_f.png`);
+    this.load.image('portrait_img_receptionist', `${base}assets/portrait_receptionist.png`);
   }
 
   create() {
@@ -184,8 +187,8 @@ export class BootScene extends Phaser.Scene {
     const ctx = ct.getContext();
 
     for (let dir = 0; dir < 4; dir++) {
-      for (let step = 0; step < 3; step++) {
-        this.drawCharacter(ctx, dir * 3 + step, dir, step, {
+      for (let step = 0; step < 6; step++) {
+        this.drawCharacter(ctx, dir * 6 + step, dir, step, {
           skin: '#f5c5a3', coat: '#1abc9c', coatDark: '#12876b',
           pants: '#0e6b55', hair: '#2c1a12', shoe: '#1a0f08',
           role: 'nurse', isPlayer: true,
@@ -213,8 +216,8 @@ export class BootScene extends Phaser.Scene {
       const pantsDark = (n: number) => hexDark(n, 0.45);
 
       for (let dir = 0; dir < 4; dir++) {
-        for (let step = 0; step < 3; step++) {
-          this.drawCharacter(ctx, dir * 3 + step, dir, step, {
+        for (let step = 0; step < 6; step++) {
+          this.drawCharacter(ctx, dir * 6 + step, dir, step, {
             skin: def.skinColor ? hexRgb(def.skinColor) : '#f5c5a3',
             coat: hexRgb(def.coatColor),
             coatDark: hexDark(def.coatColor),
@@ -341,17 +344,18 @@ export class BootScene extends Phaser.Scene {
     const moving = step > 0;
     const facing = isRight ? 1 : -1;
 
-    // Walk cycle parameters — improved amplitude and natural gait
-    const stride = moving ? (step === 1 ? 8 : -8) : 0;    // leg stride
-    const strideB = -stride;                                 // opposite leg
-    const armSwing = moving ? (step === 1 ? 7 : -7) : 0;  // arm counter-swing
+    // 6-frame smooth walk cycle using sinusoidal animation
+    const phase = moving ? (step - 1) * (Math.PI * 2 / 5) : 0;
+    const stride = moving ? Math.sin(phase) * 8 : 0;
+    const strideB = -stride;
+    const armSwing = moving ? -Math.sin(phase) * 7 : 0;
     const armSwingB = -armSwing;
-    const bob = moving ? (step === 1 ? -2 : 1) : 0;       // vertical bob
-    const tilt = moving && isLR ? (step === 1 ? 0.5 : -0.5) : 0; // subtle torso tilt
+    const bob = moving ? -Math.abs(Math.sin(phase)) * 1.5 : 0;
+    const tilt = moving && isLR ? Math.sin(phase) * 0.5 : 0;
     const cx = x + SPR_W / 2;
 
-    // Character anchor point (feet at row ~58)
-    const groundY = 54;
+    // Bigger character — groundY=72 places feet lower in the 128px canvas
+    const groundY = 72;
     const bodyBase = groundY + bob; // feet baseline
 
     // ── SHADOW ──────────────────────────────────────────────────────────────
@@ -585,9 +589,9 @@ export class BootScene extends Phaser.Scene {
 
     // ── HEAD ──────────────────────────────────────────────────────────────────
     const headCX = cx + (isLR ? facing * 1.5 : 0);
-    const headCY = torsoY - 13 + bob * 0.3;
-    const headRX = isLR ? 9 : 11;
-    const headRY = isLR ? 11 : 12;
+    const headCY = torsoY - 15 + bob * 0.3;
+    const headRX = isLR ? 11 : 13;
+    const headRY = isLR ? 13 : 14;
 
     // Head shadow
     ctx.fillStyle = 'rgba(0,0,0,0.12)';
@@ -721,6 +725,14 @@ export class BootScene extends Phaser.Scene {
 
   // ── PORTRAITS ─────────────────────────────────────────────────────────────
   private createPortraits() {
+    // Map role → loaded AI portrait image key
+    const rolePortraitImg: Record<string, string> = {
+      nurse: 'portrait_img_nurse',
+      doctor: 'portrait_img_doctor',
+      admin: 'portrait_img_admin',
+      receptionist: 'portrait_img_receptionist',
+    };
+
     for (const def of NPC_DEFS) {
       const key = `portrait_${def.id}`;
       if (this.textures.exists(key)) this.textures.remove(key);
@@ -735,109 +747,157 @@ export class BootScene extends Phaser.Scene {
       const g0 = (def.coatColor >> 8) & 0xff;
       const b0 = def.coatColor & 0xff;
 
-      // Background gradient
-      ctx.fillStyle = '#f8fafc'; ctx.fillRect(0, 0, 90, 90);
-      const bgGrad = ctx.createLinearGradient(0, 0, 90, 90);
-      bgGrad.addColorStop(0, `rgba(${r0},${g0},${b0},0.08)`);
-      bgGrad.addColorStop(1, `rgba(${r0},${g0},${b0},0.35)`);
-      ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 90, 90);
-
-      // Grid
-      ctx.strokeStyle = 'rgba(0,0,0,0.04)'; ctx.lineWidth = 0.5;
-      for (let j = 0; j < 90; j += 10) {
-        ctx.beginPath(); ctx.moveTo(j, 0); ctx.lineTo(j, 90); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(90, j); ctx.stroke();
+      // Try to use the AI-generated portrait PNG for this role
+      const imgKey = rolePortraitImg[def.role];
+      if (imgKey && this.textures.exists(imgKey)) {
+        const src = this.textures.get(imgKey).getSourceImage() as HTMLImageElement;
+        if (src && src.width) {
+          // Rounded clip mask
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(0, 0, 90, 90, 10);
+          ctx.clip();
+          ctx.drawImage(src, 0, 0, 90, 90);
+          ctx.restore();
+          // Subtle colored tint overlay to unify with game palette
+          ctx.fillStyle = `rgba(${r0},${g0},${b0},0.12)`;
+          ctx.beginPath(); ctx.roundRect(0, 0, 90, 90, 10); ctx.fill();
+          ct.refresh();
+          continue;
+        }
       }
 
-      // Shoulders
+      // ── Fallback: procedural pixel-art portrait ──────────────────────────
+      // Background gradient
+      ctx.fillStyle = '#f0f5f8'; ctx.fillRect(0, 0, 90, 90);
+      const bgGrad = ctx.createLinearGradient(0, 0, 90, 90);
+      bgGrad.addColorStop(0, `rgba(${r0},${g0},${b0},0.10)`);
+      bgGrad.addColorStop(1, `rgba(${r0},${g0},${b0},0.40)`);
+      ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, 90, 90);
+
+      // Subtle dot grid
+      ctx.fillStyle = 'rgba(0,0,0,0.04)';
+      for (let gy = 4; gy < 90; gy += 8) for (let gx = 4; gx < 90; gx += 8) {
+        ctx.fillRect(gx, gy, 1, 1);
+      }
+
+      // Shoulders — wider and more realistic
       ctx.fillStyle = coatC;
       ctx.beginPath();
-      ctx.moveTo(0, 90); ctx.lineTo(0, 60);
-      ctx.bezierCurveTo(5, 52, 35, 50, 45, 52);
-      ctx.bezierCurveTo(55, 50, 85, 52, 90, 60);
-      ctx.lineTo(90, 90); ctx.closePath(); ctx.fill();
+      ctx.moveTo(-5, 90); ctx.lineTo(-5, 58);
+      ctx.bezierCurveTo(2, 50, 32, 48, 45, 51);
+      ctx.bezierCurveTo(58, 48, 88, 50, 95, 58);
+      ctx.lineTo(95, 90); ctx.closePath(); ctx.fill();
+      // Shoulder shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.beginPath();
+      ctx.moveTo(-5, 90); ctx.lineTo(-5, 68);
+      ctx.bezierCurveTo(2, 62, 32, 60, 45, 63);
+      ctx.bezierCurveTo(58, 60, 88, 62, 95, 68);
+      ctx.lineTo(95, 90); ctx.closePath(); ctx.fill();
 
-      // Doctor lapels
+      // Doctor white coat lapels
       if (def.role === 'doctor') {
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        ctx.beginPath(); ctx.moveTo(42, 52); ctx.lineTo(0, 65); ctx.lineTo(0, 52); ctx.closePath(); ctx.fill();
-        ctx.beginPath(); ctx.moveTo(48, 52); ctx.lineTo(90, 65); ctx.lineTo(90, 52); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.85)';
+        ctx.beginPath(); ctx.moveTo(40, 51); ctx.lineTo(-5, 68); ctx.lineTo(-5, 51); ctx.closePath(); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(50, 51); ctx.lineTo(95, 68); ctx.lineTo(95, 51); ctx.closePath(); ctx.fill();
       }
 
       // Stethoscope
       if (def.role === 'doctor' || def.role === 'nurse') {
         ctx.strokeStyle = '#1a252f'; ctx.lineWidth = 2.5;
-        ctx.beginPath(); ctx.arc(45, 62, 9, 0, Math.PI); ctx.stroke();
-        ctx.fillStyle = '#1a252f';
-        ctx.beginPath(); ctx.arc(45, 71, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(45, 64, 10, 0, Math.PI); ctx.stroke();
+        ctx.fillStyle = '#2c3e50';
+        ctx.beginPath(); ctx.arc(45, 74, 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e74c3c';
+        ctx.beginPath(); ctx.arc(45, 74, 2, 0, Math.PI * 2); ctx.fill();
       }
 
-      // V-neck
+      // V-neck skin visible
       ctx.fillStyle = skinC;
-      ctx.beginPath(); ctx.moveTo(40, 52); ctx.lineTo(45, 62); ctx.lineTo(50, 52); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(38, 51); ctx.lineTo(45, 64); ctx.lineTo(52, 51); ctx.closePath(); ctx.fill();
 
       // Neck
-      ctx.fillStyle = skinC; rrFill(ctx, 38, 40, 14, 16, 4);
+      ctx.fillStyle = skinC; rrFill(ctx, 37, 38, 16, 16, 5);
+      ctx.fillStyle = darken(skinC, 0.1);
+      ctx.fillRect(37, 50, 16, 4);
 
-      // Head
+      // Head — bigger and more proportional
       ctx.fillStyle = skinC;
-      ctx.beginPath(); ctx.ellipse(45, 26, 19, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(45, 24, 21, 23, 0, 0, Math.PI * 2); ctx.fill();
+      // Subtle cheek shading
+      ctx.fillStyle = darken(skinC, 0.06);
+      ctx.beginPath(); ctx.ellipse(30, 28, 6, 8, 0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(60, 28, 6, 8, -0.2, 0, Math.PI * 2); ctx.fill();
       // Head highlight
-      ctx.fillStyle = 'rgba(255,255,255,0.15)';
-      ctx.beginPath(); ctx.ellipse(38, 18, 8, 10, -0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      ctx.beginPath(); ctx.ellipse(36, 14, 9, 10, -0.3, 0, Math.PI * 2); ctx.fill();
 
-      // Hair
+      // Hair — fuller and more volumetric
       ctx.fillStyle = hairC;
-      ctx.beginPath(); ctx.ellipse(45, 9, 19, 13, 0, 0, Math.PI * 2); ctx.fill();
-      ctx.fillRect(26, 9, 38, 18);
+      ctx.beginPath(); ctx.ellipse(45, 7, 22, 14, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillRect(24, 7, 42, 20);
+      // Hair shine
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.beginPath(); ctx.ellipse(38, 5, 8, 5, -0.2, 0, Math.PI * 2); ctx.fill();
 
-      // Eyebrows
-      ctx.fillStyle = hairC;
-      ctx.fillRect(33, 19, 9, 2); ctx.fillRect(48, 19, 9, 2);
+      // Eyebrows — arched
+      ctx.strokeStyle = darken(hairC, 0.15); ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(31, 17); ctx.quadraticCurveTo(36, 13, 41, 17); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(49, 17); ctx.quadraticCurveTo(54, 13, 59, 17); ctx.stroke();
 
-      // Eyes
+      // Eyes — larger and more expressive
       ctx.fillStyle = '#1a2530';
-      ctx.fillRect(34, 23, 6, 5); ctx.fillRect(50, 23, 6, 5);
+      rrFill(ctx, 32, 20, 9, 7, 3);
+      rrFill(ctx, 49, 20, 9, 7, 3);
       ctx.fillStyle = '#fff';
-      ctx.fillRect(34, 23, 2.5, 2.5); ctx.fillRect(50, 23, 2.5, 2.5);
+      ctx.fillRect(32, 20, 3.5, 3); ctx.fillRect(49, 20, 3.5, 3);
       ctx.fillStyle = '#000';
-      ctx.fillRect(36, 24, 3, 3); ctx.fillRect(52, 24, 3, 3);
+      ctx.fillRect(35, 21, 4, 4); ctx.fillRect(52, 21, 4, 4);
+      // Eye sparkle
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(36, 21, 1.5, 1.5); ctx.fillRect(53, 21, 1.5, 1.5);
 
-      // Nose
-      ctx.fillStyle = darken(skinC, 0.14);
-      ctx.beginPath(); ctx.arc(45, 31, 2, 0, Math.PI * 2); ctx.fill();
+      // Nose — subtle
+      ctx.fillStyle = darken(skinC, 0.13);
+      ctx.beginPath(); ctx.arc(45, 32, 2.5, 0, Math.PI * 2); ctx.fill();
 
-      // Smile
-      ctx.strokeStyle = darken(skinC, 0.22); ctx.lineWidth = 1.8;
-      ctx.beginPath(); ctx.arc(45, 37, 6, 0.15, Math.PI - 0.15); ctx.stroke();
+      // Warm smile
+      ctx.strokeStyle = darken(skinC, 0.20); ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(45, 38, 7, 0.2, Math.PI - 0.2); ctx.stroke();
 
-      // Blush
-      ctx.fillStyle = 'rgba(220,80,80,0.18)';
-      ctx.beginPath(); ctx.arc(33, 33, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(57, 33, 4, 0, Math.PI * 2); ctx.fill();
+      // Blush cheeks
+      ctx.fillStyle = 'rgba(220,80,80,0.16)';
+      ctx.beginPath(); ctx.ellipse(31, 33, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(59, 33, 5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
 
-      // Glasses
-      if (def.role === 'doctor') {
-        ctx.strokeStyle = '#4a5568'; ctx.lineWidth = 1.8;
-        rrStroke(ctx, 33, 21, 10, 7, 2.5);
-        rrStroke(ctx, 47, 21, 10, 7, 2.5);
-        ctx.beginPath(); ctx.moveTo(43, 24); ctx.lineTo(47, 24); ctx.stroke();
+      // Glasses (doctor/admin)
+      if (def.role === 'doctor' || def.role === 'admin') {
+        ctx.strokeStyle = '#4a5568'; ctx.lineWidth = 2;
+        rrStroke(ctx, 31, 19, 12, 9, 3);
+        rrStroke(ctx, 47, 19, 12, 9, 3);
+        ctx.beginPath(); ctx.moveTo(43, 23); ctx.lineTo(47, 23); ctx.stroke();
       }
 
       // Nurse cap
       if (def.role === 'nurse') {
         ctx.fillStyle = '#ffffff';
-        rrFill(ctx, 26, 4, 38, 7, 1);
+        rrFill(ctx, 24, 2, 42, 8, 2);
         ctx.fillStyle = '#e74c3c';
-        ctx.fillRect(26, 7, 38, 2.5);
+        ctx.fillRect(24, 6, 42, 3);
+        // Cap highlight
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.fillRect(24, 2, 42, 2);
       }
 
-      // Badge
+      // ID Badge
       if (def.role === 'nurse' || def.role === 'admin' || def.role === 'receptionist') {
         ctx.fillStyle = '#e74c3c';
-        rrFill(ctx, 27, 55, 15, 20, 2);
+        rrFill(ctx, 24, 57, 18, 22, 2);
         ctx.fillStyle = '#fff';
-        ctx.fillRect(29, 59, 11, 2); ctx.fillRect(29, 63, 9, 2); ctx.fillRect(29, 67, 11, 2);
+        ctx.fillRect(26, 61, 14, 2); ctx.fillRect(26, 65, 12, 2); ctx.fillRect(26, 69, 14, 2);
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.fillRect(24, 57, 18, 3);
       }
 
       ct.refresh();

@@ -16,10 +16,10 @@ export class Player extends Phaser.Physics.Arcade.Sprite {
     this.setDepth(10);
     this.setCollideWorldBounds(true);
     const body = this.body as Phaser.Physics.Arcade.Body;
-    // Body aligned with character's visual feet (drawn at groundY=54 in the 128px canvas)
-    // offsetY = 54 - 7 = 47 (centers a 14px body at the feet baseline)
+    // Body aligned with character's visual feet (drawn at groundY=72 in the 128px canvas)
+    // offsetY = 72 - 7 = 65 (centers a 14px body at the feet baseline)
     body.setSize(16, 14);
-    body.setOffset(14, 47);
+    body.setOffset(14, 65);
     this.setFrame(0);
   }
 

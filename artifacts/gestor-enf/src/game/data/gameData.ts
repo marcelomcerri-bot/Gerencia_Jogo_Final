@@ -142,84 +142,108 @@ export function createTilesetTexture(scene: Phaser.Scene) {
 
   const drawTile = (i: number, cb: (x: number) => void) => { cb(i * W); };
 
-  /** Large-format polished floor tiles — classic hospital look */
-  const bigTileFloor = (x: number, c1: string, c2: string, grout = '#9aa', glossAlpha = 0.18) => {
+  /** Premium large-format checkerboard floor — cinematic hospital look */
+  const bigTileFloor = (x: number, c1: string, c2: string, grout = '#9aa', glossAlpha = 0.22) => {
     const half = W / 2;
+    // Slight gradient wash over whole tile
+    const wash = ctx.createLinearGradient(x, 0, x + W, W);
+    wash.addColorStop(0, 'rgba(255,255,255,0.06)');
+    wash.addColorStop(1, 'rgba(0,0,0,0.04)');
     ctx.fillStyle = c1; ctx.fillRect(x, 0, half, half);
     ctx.fillStyle = c2; ctx.fillRect(x + half, 0, half, half);
     ctx.fillStyle = c2; ctx.fillRect(x, half, half, half);
     ctx.fillStyle = c1; ctx.fillRect(x + half, half, half, half);
-    // Grout lines
-    ctx.strokeStyle = grout; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.55;
+    ctx.fillStyle = wash; ctx.fillRect(x, 0, W, W);
+    // Grout lines — thin and crisp
+    ctx.strokeStyle = grout; ctx.lineWidth = 1; ctx.globalAlpha = 0.5;
     ctx.strokeRect(x + 0.5, 0.5, W - 1, W - 1);
     ctx.beginPath(); ctx.moveTo(x + half, 0); ctx.lineTo(x + half, W); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(x, half); ctx.lineTo(x + W, half); ctx.stroke();
     ctx.globalAlpha = 1;
-    // Specular gloss highlight (top-left corner of each tile)
+    // Strong specular gloss — top-left of each sub-tile
     ctx.fillStyle = `rgba(255,255,255,${glossAlpha})`;
-    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + half * 0.55, 0);
-    ctx.lineTo(x, half * 0.55); ctx.closePath(); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(x + half, half);
-    ctx.lineTo(x + half + half * 0.55, half);
-    ctx.lineTo(x + half, half + half * 0.55); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + half * 0.65, 0); ctx.lineTo(x, half * 0.65); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + half, half); ctx.lineTo(x + half + half * 0.65, half); ctx.lineTo(x + half, half + half * 0.65); ctx.closePath(); ctx.fill();
+    // Subtle vignette darkening at tile edges
+    ctx.fillStyle = 'rgba(0,0,0,0.05)'; ctx.fillRect(x, W - 2, W, 2); ctx.fillRect(x + W - 2, 0, 2, W);
   };
 
   /**
-   * Clean pixel-art floor tile matching the reference UTI image style:
-   * bright uniform base color + thin grout line + subtle top-left specular.
+   * Premium pixel-art floor — bright base + grout + specular triangle + edge shadow.
+   * Used for themed rooms.
    */
-  const pixelArtFloor = (x: number, base: string, grout: string, highlightAlpha = 0.15) => {
-    ctx.fillStyle = base;
-    ctx.fillRect(x, 0, W, W);
-    // Thin grout lines (1px border + center cross)
-    ctx.strokeStyle = grout; ctx.lineWidth = 1; ctx.globalAlpha = 0.5;
+  const pixelArtFloor = (x: number, base: string, grout: string, highlightAlpha = 0.18) => {
+    // Base fill
+    ctx.fillStyle = base; ctx.fillRect(x, 0, W, W);
+    // Subtle vertical gradient wash
+    const wash = ctx.createLinearGradient(x, 0, x, W);
+    wash.addColorStop(0, 'rgba(255,255,255,0.07)');
+    wash.addColorStop(0.5, 'rgba(255,255,255,0)');
+    wash.addColorStop(1, 'rgba(0,0,0,0.05)');
+    ctx.fillStyle = wash; ctx.fillRect(x, 0, W, W);
+    // Grout border — crisp 1px
+    ctx.strokeStyle = grout; ctx.lineWidth = 1; ctx.globalAlpha = 0.45;
     ctx.strokeRect(x + 0.5, 0.5, W - 1, W - 1);
     ctx.globalAlpha = 1;
-    // Specular highlight — small triangle top-left
+    // Specular triangle — top-left
     ctx.fillStyle = `rgba(255,255,255,${highlightAlpha})`;
     ctx.beginPath();
-    ctx.moveTo(x, 0); ctx.lineTo(x + W * 0.45, 0); ctx.lineTo(x, W * 0.45);
+    ctx.moveTo(x, 0); ctx.lineTo(x + W * 0.52, 0); ctx.lineTo(x, W * 0.52);
     ctx.closePath(); ctx.fill();
-    // Bottom-right subtle shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.06)';
+    // Secondary gloss spot (smaller, top-right)
+    ctx.fillStyle = `rgba(255,255,255,${highlightAlpha * 0.35})`;
     ctx.beginPath();
-    ctx.moveTo(x + W, W); ctx.lineTo(x + W - W * 0.35, W); ctx.lineTo(x + W, W - W * 0.35);
+    ctx.moveTo(x + W, 0); ctx.lineTo(x + W - W * 0.2, 0); ctx.lineTo(x + W, W * 0.2);
     ctx.closePath(); ctx.fill();
+    // Bottom-right edge shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.07)';
+    ctx.beginPath(); ctx.moveTo(x + W, W); ctx.lineTo(x + W - W * 0.4, W); ctx.lineTo(x + W, W - W * 0.4); ctx.closePath(); ctx.fill();
   };
 
-  /** Wainscot-patterned wall (horizontal relief bands) */
+  /** Premium wainscot wall with 3D panels, molding and ambient base shadow */
   const wallTile = (x: number, topCol: string, bandLight: string, bandDark: string, baseCol: string) => {
-    // Full background
-    ctx.fillStyle = topCol; ctx.fillRect(x, 0, W, W);
-    // Raised wainscot panels (3 bands)
-    const bands = 3;
-    const bh = Math.floor((W - 4) / bands);
-    for (let b = 0; b < bands; b++) {
-      const by = b * bh + 1;
-      const ox = b % 2 === 0 ? 0 : W / 2;
-      for (let bx = ox; bx < W + W / 2; bx += W) {
-        if (bx >= W) break;
-        const pw = Math.min(W / 2 - 2, W - bx - 1);
-        if (pw <= 0) continue;
-        // Panel highlight top
-        ctx.fillStyle = bandLight; ctx.fillRect(x + bx, by, pw, 1);
-        // Panel body
-        ctx.fillStyle = topCol; ctx.fillRect(x + bx + 1, by + 1, pw - 2, bh - 3);
-        // Panel shadow bottom
-        ctx.fillStyle = bandDark; ctx.fillRect(x + bx, by + bh - 2, pw, 2);
+    // Wall background — slight top-to-bottom gradient for warmth
+    const wallGrad = ctx.createLinearGradient(x, 0, x, W);
+    wallGrad.addColorStop(0, bandLight);
+    wallGrad.addColorStop(0.3, topCol);
+    wallGrad.addColorStop(1, topCol);
+    ctx.fillStyle = wallGrad; ctx.fillRect(x, 0, W, W);
+    // Raised wainscot panels (2 staggered rows)
+    const panelH = Math.floor((W - 6) / 2);
+    for (let row = 0; row < 2; row++) {
+      const py = row * (panelH + 3) + 2;
+      const offset = row === 1 ? Math.floor(W / 4) : 0;
+      const panelW = Math.floor(W / 2) - 3;
+      for (let col = 0; col < 3; col++) {
+        const px = x + (col * Math.floor(W / 2)) - offset;
+        if (px + 2 >= x + W || px < x) continue;
+        const pw = Math.min(panelW, x + W - px - 2);
+        if (pw < 4) continue;
+        // Panel sunken body
+        ctx.fillStyle = topCol; ctx.fillRect(px + 1, py + 1, pw - 2, panelH - 2);
+        // Panel top highlight
+        ctx.fillStyle = bandLight; ctx.fillRect(px, py, pw, 1);
+        // Panel left highlight
+        ctx.fillStyle = bandLight; ctx.fillRect(px, py, 1, panelH);
+        // Panel bottom shadow
+        ctx.fillStyle = bandDark; ctx.fillRect(px, py + panelH - 1, pw, 1);
+        // Panel right shadow
+        ctx.fillStyle = bandDark; ctx.fillRect(px + pw - 1, py, 1, panelH);
       }
     }
-    // Top edge / crown molding
-    ctx.fillStyle = 'rgba(255,255,255,0.65)'; ctx.fillRect(x, 0, W, 2);
+    // Crown molding — top
+    ctx.fillStyle = 'rgba(255,255,255,0.7)'; ctx.fillRect(x, 0, W, 2);
     ctx.fillStyle = bandDark; ctx.fillRect(x, 2, W, 1);
-    // Baseboard
-    ctx.fillStyle = baseCol; ctx.fillRect(x, W - 6, W, 4);
+    ctx.fillStyle = bandLight; ctx.fillRect(x, 3, W, 1);
+    // Baseboard strip
+    ctx.fillStyle = baseCol; ctx.fillRect(x, W - 7, W, 5);
+    ctx.fillStyle = bandLight; ctx.fillRect(x, W - 7, W, 1);
     ctx.fillStyle = bandDark; ctx.fillRect(x, W - 2, W, 2);
-    // Depth shadow at base
-    const shadowGrad = ctx.createLinearGradient(x, W - 8, x, W);
-    shadowGrad.addColorStop(0, 'rgba(0,0,0,0)');
-    shadowGrad.addColorStop(1, 'rgba(0,0,0,0.55)');
-    ctx.fillStyle = shadowGrad; ctx.fillRect(x, W - 8, W, 8);
+    // Ambient occlusion shadow at very bottom
+    const aoGrad = ctx.createLinearGradient(x, W - 9, x, W);
+    aoGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    aoGrad.addColorStop(1, 'rgba(0,0,0,0.45)');
+    ctx.fillStyle = aoGrad; ctx.fillRect(x, W - 9, W, 9);
   };
 
   /** 0 — GARDEN: rich grass with blade texture */
