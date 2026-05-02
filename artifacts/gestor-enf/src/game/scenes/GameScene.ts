@@ -1321,8 +1321,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (this.isDialogOpen || this.isCrisisOpen) {
-       // if dialogue is open, maybe they press action to advance it?
-       // The DialogScene handles its own input. But we should reset action just in case.
+       // Stop player movement completely while dialog/crisis is open
+       this.player.move(false, false, false, false, delta);
        if (vpad.actionJustPressed) vpad.actionJustPressed = false;
        return;
     }
