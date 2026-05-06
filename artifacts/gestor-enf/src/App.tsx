@@ -4,10 +4,17 @@ import { createGameConfig } from "./game/config";
 import { AppUI } from "./ui/AppUI";
 import { GAME_WIDTH, GAME_HEIGHT } from "./game/constants";
 
+// Stable one-time check — never changes on resize.
+// Used exclusively to decide whether to show touch controls.
+const IS_MOBILE_DEVICE =
+  navigator.maxTouchPoints > 1 ||
+  /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+
+// Separate check for CSS rotation layout (portrait phone holding portrait).
 function isPortraitMobile() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  return Math.min(vw, vh) < 768 && vh > vw;
+  return IS_MOBILE_DEVICE && vh > vw;
 }
 
 /**
@@ -121,7 +128,7 @@ export default function App() {
         <div style={innerStyle}>
           <div id="game-container" ref={containerRef} style={{ position: "absolute", inset: 0 }} />
           <div style={{ position: "absolute", inset: 0, zIndex: 100, pointerEvents: "none" }}>
-            <AppUI onStartGame={handleStartGame} isMobile={true} mobileScale={scale} />
+            <AppUI onStartGame={handleStartGame} isMobile={IS_MOBILE_DEVICE} mobileScale={scale} />
           </div>
         </div>
       </div>
@@ -138,7 +145,7 @@ export default function App() {
     >
       <div id="game-container" ref={containerRef} className="absolute inset-0 z-0" />
       <div className="absolute inset-0 z-10 pointer-events-none">
-        <AppUI onStartGame={handleStartGame} />
+        <AppUI onStartGame={handleStartGame} isMobile={IS_MOBILE_DEVICE} />
       </div>
     </div>
   );
