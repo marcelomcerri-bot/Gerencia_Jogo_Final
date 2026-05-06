@@ -327,8 +327,8 @@ function MobileControls() {
         <DPadBtn label="RUN" padKey="sprint" style={{ left: 62, top: 62, fontSize: 12 }} color="#f39c12" />
       </div>
 
-      {/* Action buttons — bottom-right */}
-      <div style={{ position: "absolute", right: 24, bottom: 24, width: 160, height: 160, pointerEvents: "auto" }}>
+      {/* Action buttons — top-right (portrait top = landscape right when rotated 90° CW) */}
+      <div style={{ position: "absolute", right: 24, top: 24, width: 160, height: 160, pointerEvents: "auto" }}>
         <FireBtn label="FALAR" padKey="actionJustPressed"  color="#f39c12" style={{ right: 0,  top: 20 }} />
         <FireBtn label="MISSÃO" padKey="missionJustPressed" color="#9b59b6" style={{ left: 0,  bottom: 0 }} />
         <FireBtn label="PAUSA" padKey="menuJustPressed"    color="#e74c3c" style={{ right: 0, bottom: 0 }} />
