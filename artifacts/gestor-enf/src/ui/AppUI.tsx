@@ -313,6 +313,16 @@ function FireBtn({
 }
 
 function MobileControls({ mobileScale = 1 }: { mobileScale?: number }) {
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: Event) => setDialogOpen((e as CustomEvent<{ active: boolean }>).detail.active);
+    window.addEventListener('dialogactive', handler);
+    return () => window.removeEventListener('dialogactive', handler);
+  }, []);
+
+  if (dialogOpen) return null;
+
   // Counter-scale so buttons appear at native finger-friendly size on screen,
   // regardless of how much the outer wrapper CSS-scales down the game canvas.
   const cs = 1 / Math.max(0.1, mobileScale);

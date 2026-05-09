@@ -50,6 +50,10 @@ export class DialogScene extends Phaser.Scene {
   }
 
   create() {
+    // Signal React overlay to hide mobile controls
+    (window as any).dialogActive = true;
+    window.dispatchEvent(new CustomEvent('dialogactive', { detail: { active: true } }));
+
     // Dimmer overlay
     this.overlay = this.add.rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.45);
 
@@ -514,6 +518,10 @@ export class DialogScene extends Phaser.Scene {
     this.input.keyboard?.off('keydown-SPACE', this.handleAdvance, this);
     this.input.keyboard?.off('keydown-ESC', this.handleEsc, this);
     this.input.off('pointerdown', this.handleAdvance, this);
+
+    // Signal React overlay to restore mobile controls
+    (window as any).dialogActive = false;
+    window.dispatchEvent(new CustomEvent('dialogactive', { detail: { active: false } }));
 
     this.tweens.add({
       targets: [this.boxContainer, this.overlay, this.choiceArea],

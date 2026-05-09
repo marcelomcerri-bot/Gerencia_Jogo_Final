@@ -473,6 +473,10 @@ export class BootScene extends Phaser.Scene {
     ctx.fillRect(torsoX + 2, torsoY + 2, torsoW, torsoH);
     ctx.fillStyle = c.coat;
     rrFill(ctx, torsoX, torsoY, torsoW, torsoH, 4);
+    // Dark outline around torso for pixel-art definition
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 1.5;
+    rrStroke(ctx, torsoX, torsoY, torsoW, torsoH, 4);
     ctx.fillStyle = c.coatDark;
     if (isLR) {
       const shadeSide = facing > 0 ? torsoX : torsoX + torsoW - 4;
@@ -567,7 +571,7 @@ export class BootScene extends Phaser.Scene {
     // ── ARMS ──────────────────────────────────────────────────────────────────
     const armY = torsoY + 2;
     const armH = 16;
-    const armW = 5;
+    const armW = 7;
     if (isLR) {
       const backArmX = facing > 0 ? torsoX - 4 : torsoX + torsoW;
       ctx.fillStyle = darken(c.role === 'doctor' ? '#ffffff' : c.coat, 0.25);
@@ -620,6 +624,10 @@ export class BootScene extends Phaser.Scene {
     ctx.beginPath(); ctx.ellipse(headCX + 2, headCY + 2, headRX, headRY, 0, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = c.skin;
     ctx.beginPath(); ctx.ellipse(headCX, headCY, headRX, headRY, 0, 0, Math.PI * 2); ctx.fill();
+    // Dark outline around head for pixel-art definition
+    ctx.strokeStyle = 'rgba(0,0,0,0.42)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
     ctx.beginPath(); ctx.ellipse(headCX - headRX * 0.3, headCY - headRY * 0.3, headRX * 0.5, headRY * 0.4, 0, 0, Math.PI * 2); ctx.fill();
 
