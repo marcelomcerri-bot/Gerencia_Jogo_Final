@@ -158,6 +158,8 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Phaser alone is ~1 MB; raise the warning threshold to avoid noise.
+    chunkSizeWarningLimit: 2000,
   },
   server: {
     port,
