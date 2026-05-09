@@ -52,7 +52,10 @@ function StatBar({
           {display}
         </span>
       </div>
-      <div className="h-2 rounded-full overflow-hidden" style={{ background: "#111c2e" }}>
+      <div
+        className="h-2 rounded-full overflow-hidden"
+        style={{ background: "#111c2e" }}
+      >
         <motion.div
           className="h-full rounded-full"
           animate={{ width: `${Math.max(0, Math.min(100, value))}%` }}
@@ -81,7 +84,7 @@ function PlayerCard({ player, index }: { player: PlayerData; index: number }) {
         background: "#0b1929",
       }}
     >
-      {/* Card header */}
+      {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3"
         style={{ background: `${color}18` }}
@@ -114,13 +117,16 @@ function PlayerCard({ player, index }: { player: PlayerData; index: number }) {
         </div>
       </div>
 
-      {/* Card body */}
+      {/* Body */}
       <div className="px-4 py-3 flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-400 font-mono truncate pr-2">
             📍 {player.currentRoom}
           </span>
-          <span className="text-xs font-mono font-bold whitespace-nowrap" style={{ color }}>
+          <span
+            className="text-xs font-mono font-bold whitespace-nowrap"
+            style={{ color }}
+          >
             ⭐ {player.prestige} pts
           </span>
         </div>
@@ -139,7 +145,9 @@ function PlayerCard({ player, index }: { player: PlayerData; index: number }) {
         />
 
         <div className="flex justify-between items-center text-xs font-mono">
-          <span className="text-gray-500">✅ {player.completedMissions} missões</span>
+          <span className="text-gray-500">
+            ✅ {player.completedMissions} missões
+          </span>
           <span className="text-gray-600">🕐 {formatTime(player.shiftTime)}</span>
         </div>
 
@@ -164,44 +172,36 @@ function gridClass(n: number): string {
 
 export function ProfessorView() {
   const navigate = useNavigate();
-  const [roomInput, setRoomInput] = useState("");
-  const [activeCode, setActiveCode] = useState("");
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const [error, setError] = useState("");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
-  const fetchPlayers = useCallback(async (code: string) => {
+  const fetchPlayers = useCallback(async () => {
     try {
-      const res = await fetch(`/api/rooms/${encodeURIComponent(code)}/players`);
+      const res = await fetch("/api/rooms/GLOBAL/players");
       if (!res.ok) throw new Error("fetch failed");
       const data = await res.json();
       setPlayers(data.players ?? []);
       setLastRefresh(new Date());
       setError("");
     } catch {
-      setError("Erro de conexão com o servidor");
+      setError("Erro de conexão");
     }
   }, []);
 
   useEffect(() => {
-    if (!activeCode) return;
-    fetchPlayers(activeCode);
-    const id = setInterval(() => fetchPlayers(activeCode), 3000);
+    fetchPlayers();
+    const id = setInterval(fetchPlayers, 3000);
     return () => clearInterval(id);
-  }, [activeCode, fetchPlayers]);
-
-  const enter = () => {
-    const code = roomInput.trim().toUpperCase();
-    if (!code) return;
-    setActiveCode(code);
-  };
+  }, [fetchPlayers]);
 
   const onlineCount = players.filter((p) => p.online).length;
 
   return (
+    /* pointer-events-auto is critical: this sits inside a pointer-events-none shell in App.tsx */
     <div
-      className="fixed inset-0 flex flex-col overflow-hidden"
-      style={{ background: "#060e1a" }}
+      className="fixed inset-0 flex flex-col overflow-hidden pointer-events-auto"
+      style={{ background: "#060e1a", zIndex: 200 }}
     >
       {/* Top bar */}
       <div
@@ -220,136 +220,71 @@ export function ProfessorView() {
           style={{
             fontFamily: "'Press Start 2P', monospace",
             color: "#1abc9c",
-            fontSize: "clamp(10px, 2vw, 16px)",
+            fontSize: "clamp(10px, 2vw, 15px)",
           }}
         >
           MODO PROFESSOR
         </h1>
-        {activeCode && lastRefresh && (
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          {lastRefresh && (
             <span className="text-xs font-mono text-gray-600">
               {lastRefresh.toLocaleTimeString()}
             </span>
-            <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-          </div>
+          )}
+          <div
+            className="w-2 h-2 rounded-full animate-pulse"
+            style={{ background: error ? "#e74c3c" : "#2ecc71" }}
+          />
+        </div>
+      </div>
+
+      {/* Stats bar */}
+      <div
+        className="flex items-center gap-6 px-6 py-3 border-b flex-shrink-0"
+        style={{ borderColor: "#0e2a1e", background: "#081420" }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-2xl font-mono font-bold" style={{ color: "#1abc9c" }}>
+            {onlineCount}
+          </span>
+          <span className="text-sm font-mono text-gray-500">
+            {onlineCount === 1 ? "jogador online" : "jogadores online"}
+          </span>
+        </div>
+        {players.length > onlineCount && (
+          <span className="text-xs font-mono text-gray-700">
+            + {players.length - onlineCount} offline
+          </span>
+        )}
+        {error && (
+          <span className="text-xs font-mono text-red-500 ml-auto">{error}</span>
         )}
       </div>
 
-      {/* Main content */}
-      {!activeCode ? (
-        /* ── Room code entry screen ── */
-        <div className="flex flex-col items-center justify-center flex-1 gap-5 p-8">
-          <div className="text-6xl mb-2">👩‍🏫</div>
-          <p
-            className="font-mono text-lg font-bold"
-            style={{ color: "#1abc9c" }}
-          >
-            Código da turma
-          </p>
-          <p className="font-mono text-sm text-center max-w-xs" style={{ color: "#4a6a5a" }}>
-            Informe o código que os alunos usarão ao iniciar o jogo.
-            <br />
-            Exemplo: <strong style={{ color: "#1abc9c" }}>TURMA-A</strong>
-          </p>
-          <div className="flex gap-3 mt-1">
-            <input
-              value={roomInput}
-              onChange={(e) => setRoomInput(e.target.value.toUpperCase())}
-              onKeyDown={(e) => e.key === "Enter" && enter()}
-              placeholder="TURMA-A"
-              autoFocus
-              className="px-4 py-3 rounded-lg text-white font-mono text-lg w-44 focus:outline-none"
-              style={{
-                background: "#0d1f35",
-                border: "2px solid #1abc9c44",
-                caretColor: "#1abc9c",
-              }}
-            />
-            <button
-              onClick={enter}
-              disabled={!roomInput.trim()}
-              className="px-6 py-3 rounded-lg font-mono font-bold transition-opacity"
-              style={{
-                background: "#1abc9c",
-                color: "#fff",
-                opacity: roomInput.trim() ? 1 : 0.35,
-              }}
-            >
-              ENTRAR
-            </button>
-          </div>
-          {error && (
-            <p className="text-red-400 font-mono text-sm">{error}</p>
-          )}
-        </div>
-      ) : (
-        /* ── Dashboard ── */
-        <div className="flex-1 overflow-auto p-5">
-          {/* Dashboard sub-header */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <span
-                className="font-mono font-bold text-lg"
-                style={{ color: "#1abc9c" }}
-              >
-                Turma:{" "}
-                <span
-                  className="px-2 py-0.5 rounded text-base"
-                  style={{ background: "#1abc9c22", color: "#1abc9c" }}
-                >
-                  {activeCode}
-                </span>
-              </span>
-              <span className="font-mono text-sm text-gray-500">
-                {onlineCount}/{players.length} online
-              </span>
-            </div>
-            <button
-              onClick={() => {
-                setActiveCode("");
-                setPlayers([]);
-                setRoomInput("");
-              }}
-              className="font-mono text-xs text-gray-600 hover:text-gray-300 transition-colors"
-            >
-              trocar turma
-            </button>
-          </div>
-
-          {error && (
-            <p className="text-red-400 font-mono text-sm text-center mb-4">
-              {error}
+      {/* Dashboard */}
+      <div className="flex-1 overflow-auto p-5">
+        {players.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <div className="text-6xl opacity-30">👩‍🏫</div>
+            <p className="font-mono text-lg text-gray-600">
+              Nenhum jogador ativo no momento
             </p>
-          )}
-
-          {players.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 gap-4">
-              <div className="text-5xl opacity-40">⏳</div>
-              <p className="font-mono text-lg text-gray-600">
-                Aguardando jogadores...
-              </p>
-              <p className="font-mono text-sm text-center text-gray-700">
-                Peça aos alunos para usar o código{" "}
-                <span
-                  className="font-bold"
-                  style={{ color: "#1abc9c" }}
-                >
-                  {activeCode}
-                </span>{" "}
-                ao iniciar um novo jogo
-              </p>
-            </div>
-          ) : (
-            <div className={`grid gap-4 ${gridClass(players.length)}`}>
-              <AnimatePresence mode="popLayout">
-                {players.map((p, i) => (
-                  <PlayerCard key={p.playerId} player={p} index={i} />
-                ))}
-              </AnimatePresence>
-            </div>
-          )}
-        </div>
-      )}
+            <p className="font-mono text-sm text-gray-700 text-center">
+              Assim que os alunos iniciarem o jogo,
+              <br />
+              eles aparecerão aqui automaticamente.
+            </p>
+          </div>
+        ) : (
+          <div className={`grid gap-4 w-full ${gridClass(players.length)}`}>
+            <AnimatePresence mode="popLayout">
+              {players.map((p, i) => (
+                <PlayerCard key={p.playerId} player={p} index={i} />
+              ))}
+            </AnimatePresence>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

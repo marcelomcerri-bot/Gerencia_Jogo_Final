@@ -11,6 +11,39 @@ import { hasSave, clearSave } from "../game/utils/save";
 import { playSound } from "../game/utils/audio";
 import { ProfessorView } from "./ProfessorView";
 
+// Students are identified by a generated ID stored in sessionStorage so the
+// professor dashboard can track them across the session without any login.
+function getOrCreatePlayerId(): string {
+  const key = "gestor_player_id";
+  let id = sessionStorage.getItem(key);
+  if (!id) {
+    id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    sessionStorage.setItem(key, id);
+  }
+  return id;
+}
+
+async function registerInGlobalRoom() {
+  const playerId = getOrCreatePlayerId();
+  const playerName = `Estudante`;
+  try {
+    // Use PUT-style upsert: join always re-registers with the same stored ID.
+    // Since our API generates a new ID, we track ours separately and send
+    // heartbeats using window.sessionRoom which is set here.
+    const res = await fetch("/api/rooms/GLOBAL/join", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerName }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      (window as any).sessionRoom = { code: "GLOBAL", playerId: data.playerId };
+    }
+  } catch {
+    // silent — professor mode is optional, game works without it
+  }
+}
+
 export function AppUI({
   onStartGame,
   isMobile = false,
@@ -74,164 +107,24 @@ function RoutesWrapper({
 }
 
 // ---------------------------------------------------------------------------
-// Join modal — shown before NOVO JOGO; collects player name + optional room code
-// ---------------------------------------------------------------------------
-
-function JoinModal({
-  onConfirm,
-  onCancel,
-}: {
-  onConfirm: (playerName: string, roomCode: string) => void;
-  onCancel: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [joining, setJoining] = useState(false);
-  const [err, setErr] = useState("");
-
-  const handleJoin = async () => {
-    const playerName = name.trim() || "Estudante";
-    const roomCode = code.trim().toUpperCase();
-    setErr("");
-
-    if (roomCode) {
-      setJoining(true);
-      try {
-        const res = await fetch(`/api/rooms/${encodeURIComponent(roomCode)}/join`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ playerName }),
-        });
-        if (!res.ok) throw new Error("Falha ao entrar na sala");
-        const data = await res.json();
-        (window as any).sessionRoom = { code: roomCode, playerId: data.playerId };
-      } catch {
-        setErr("Não foi possível conectar ao servidor. Verifique o código.");
-        setJoining(false);
-        return;
-      }
-    } else {
-      delete (window as any).sessionRoom;
-    }
-
-    onConfirm(playerName, roomCode);
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 pointer-events-auto"
-      onClick={(e) => e.target === e.currentTarget && onCancel()}
-    >
-      <motion.div
-        initial={{ scale: 0.92, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.92, y: 20 }}
-        className="rounded-2xl p-8 max-w-sm w-full mx-4 flex flex-col gap-5"
-        style={{ background: "#0a1628", border: "3px solid #1abc9c" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2
-          className="text-center"
-          style={{
-            fontFamily: "'Press Start 2P', monospace",
-            color: "#1abc9c",
-            fontSize: 13,
-          }}
-        >
-          NOVO JOGO
-        </h2>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-mono text-gray-400">
-            Seu nome (opcional)
-          </label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Estudante"
-            autoFocus
-            maxLength={24}
-            className="px-3 py-2.5 rounded-lg text-white font-mono text-sm focus:outline-none"
-            style={{
-              background: "#0d1f35",
-              border: "2px solid #1abc9c44",
-              caretColor: "#1abc9c",
-            }}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-mono text-gray-400">
-            Código da turma{" "}
-            <span className="text-gray-600">(deixe em branco para jogar sozinho)</span>
-          </label>
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            onKeyDown={(e) => e.key === "Enter" && handleJoin()}
-            placeholder="Ex: TURMA-A"
-            maxLength={20}
-            className="px-3 py-2.5 rounded-lg text-white font-mono text-sm focus:outline-none tracking-widest"
-            style={{
-              background: "#0d1f35",
-              border: "2px solid #1abc9c44",
-              caretColor: "#1abc9c",
-            }}
-          />
-          <p className="text-xs font-mono text-gray-600">
-            Peça o código ao seu professor para que ele possa acompanhar.
-          </p>
-        </div>
-
-        {err && (
-          <p className="text-red-400 font-mono text-xs text-center">{err}</p>
-        )}
-
-        <div className="flex gap-3 mt-1">
-          <button
-            onClick={onCancel}
-            className="flex-1 py-3 rounded-lg font-mono text-sm transition-colors"
-            style={{
-              background: "transparent",
-              border: "2px solid #1e3a50",
-              color: "#6b8fa8",
-            }}
-          >
-            VOLTAR
-          </button>
-          <button
-            onClick={handleJoin}
-            disabled={joining}
-            className="flex-1 py-3 rounded-lg font-mono font-bold text-sm transition-opacity"
-            style={{
-              background: "#1abc9c",
-              color: "#fff",
-              opacity: joining ? 0.5 : 1,
-            }}
-          >
-            {joining ? "ENTRANDO..." : "JOGAR"}
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Home menu
 // ---------------------------------------------------------------------------
 
 function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
   const navigate = useNavigate();
   const [showHelp, setShowHelp] = useState(false);
-  const [showJoin, setShowJoin] = useState(false);
 
-  const handleJoinConfirm = (_playerName: string, _roomCode: string) => {
+  const startNew = () => {
     playSound("click");
     clearSave();
+    registerInGlobalRoom(); // fire-and-forget — joins professor dashboard automatically
+    onStartGame();
+    navigate("/game");
+  };
+
+  const continueGame = () => {
+    playSound("click");
+    registerInGlobalRoom();
     onStartGame();
     navigate("/game");
   };
@@ -250,11 +143,7 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
               onMouseEnter={() => playSound("hover")}
               whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => {
-                playSound("click");
-                onStartGame();
-                navigate("/game");
-              }}
+              onClick={continueGame}
               className="flex items-center justify-center gap-3 bg-indigo-500 text-white px-8 py-4 rounded-xl shadow-[0_4px_0_#312e81] border-2 border-white font-['Press_Start_2P',_monospace] tracking-widest text-sm hover:bg-indigo-400"
             >
               CONTINUAR
@@ -265,10 +154,7 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
             onMouseEnter={() => playSound("hover")}
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              playSound("click");
-              setShowJoin(true);
-            }}
+            onClick={startNew}
             className="flex items-center justify-center gap-3 bg-[#1abc9c] text-white px-8 py-4 rounded-xl shadow-[0_4px_0_#0e6252] border-2 border-white font-['Press_Start_2P',_monospace] tracking-widest text-sm hover:bg-[#1dd2af]"
           >
             NOVO JOGO
@@ -278,10 +164,7 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
             onMouseEnter={() => playSound("hover")}
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              playSound("click");
-              setShowHelp(true);
-            }}
+            onClick={() => { playSound("click"); setShowHelp(true); }}
             className="flex items-center justify-center gap-3 bg-[#f39c12] text-white px-8 py-4 rounded-xl shadow-[0_4px_0_#a66705] border-2 border-white font-['Press_Start_2P',_monospace] tracking-widest text-sm hover:bg-[#f4a62a]"
           >
             COMO JOGAR
@@ -291,15 +174,9 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
             onMouseEnter={() => playSound("hover")}
             whileHover={{ scale: 1.05, y: -2 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => {
-              playSound("click");
-              navigate("/professor");
-            }}
+            onClick={() => { playSound("click"); navigate("/professor"); }}
             className="flex items-center justify-center gap-3 text-white px-8 py-4 rounded-xl border-2 border-white font-['Press_Start_2P',_monospace] tracking-widest text-sm"
-            style={{
-              background: "#2c3e70",
-              boxShadow: "0 4px 0 #1a2348",
-            }}
+            style={{ background: "#2c3e70", boxShadow: "0 4px 0 #1a2348" }}
           >
             🎓 MODO PROFESSOR
           </motion.button>
@@ -347,15 +224,6 @@ function HomeMenu({ onStartGame }: { onStartGame: () => void }) {
         </motion.div>
       )}
 
-      {/* Join modal — rendered as overlay outside the main button group */}
-      <AnimatePresence>
-        {showJoin && (
-          <JoinModal
-            onConfirm={handleJoinConfirm}
-            onCancel={() => setShowJoin(false)}
-          />
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }
