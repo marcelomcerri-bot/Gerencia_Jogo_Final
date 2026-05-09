@@ -1,6 +1,9 @@
 # Gestor ENF - Nursing Management Educational RPG
 
 ## Recent Changes (May 2026)
+- **Modo Professor**: New spectator dashboard accessible from the home menu. Professor enters a room code and sees a live grid of all students' game states (room, prestige, energy, stress, missions, last activity) updated every 3s. Students enter the same code when starting a new game via the JoinModal. The API is embedded directly in the Vite dev server via a custom `roomApiPlugin()` in `vite.config.ts` (no second server needed). Room state is in-memory; players inactive >90s are cleaned up automatically.
+- **JoinModal**: Clicking NOVO JOGO now shows a modal asking for the student's name (optional) and the class room code (optional — blank = solo play).
+- **ProfessorView** (`src/ui/ProfessorView.tsx`): Grid layout auto-adapts — 1 player (1 col), 2 (2 col), 3-4 (2×2), 5-6 (3 col), 7+ (4 col). Cards show energy/stress bars, prestige, room, level, last activity, online indicator.
 - **Dialogue choices**: Completely redesigned from a scattered diagonal layout to a clean full-width vertical stack above the dialogue box. Includes backdrop, numbered badge with teal accent, keyboard shortcuts `[1]`-`[4]`, and yellow highlight on hover.
 - **Character sprites**: Slimmed down significantly — torso reduced from 23px→17px (front) and 20px→14px (side), arms from 7px→5px, groundY lowered from 72→68. All proportions are more pixel-art appropriate. Physics body offsets updated to match (setOffset(15,61)).
 - **16 unique NPC hair styles + visual profiles**: CharVisual interface with build/height/gender/age/accessory per character, drawHair() method with 16 named styles.

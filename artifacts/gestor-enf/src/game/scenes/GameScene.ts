@@ -36,6 +36,7 @@ export class GameScene extends Phaser.Scene {
   private lastHudEmit = 0;
   private crisisTimer = 0;
   private nextCrisisTime = 0;
+  private lastActivity = 'Explorando o hospital';
 
   // Ambient lights/decor
   private darkOverlay!: Phaser.GameObjects.RenderTexture;
@@ -73,6 +74,9 @@ export class GameScene extends Phaser.Scene {
 
     // Auto-save every 30s
     this.time.addEvent({ delay: 30000, loop: true, callback: () => saveGame(this.state) });
+
+    // Professor mode: broadcast state every 5s
+    this.time.addEvent({ delay: 5000, loop: true, callback: () => this.broadcastState() });
 
     // Schedule first crisis event (1-2 game minutes = 20-40s real)
     this.scheduleCrisis();
@@ -1243,6 +1247,7 @@ export class GameScene extends Phaser.Scene {
     const event = available[Phaser.Math.Between(0, available.length - 1)];
     
     this.isCrisisOpen = true;
+    this.lastActivity = `Respondendo a uma crise: ${event.title}`;
     const hud = this.scene.get('HUDScene') as any;
     if (hud) {
       hud.showCrisisOverlay(event, (choiceIdx: number) => {
@@ -1421,7 +1426,10 @@ export class GameScene extends Phaser.Scene {
     if (tileId !== this.currentRoom) {
       this.currentRoom = tileId;
       const roomName = ROOM_NAMES[tileId] || '';
-      if (roomName) this.events.emit(EV.ROOM_CHANGE, roomName);
+      if (roomName) {
+        this.events.emit(EV.ROOM_CHANGE, roomName);
+        this.lastActivity = `Entrou em ${roomName}`;
+      }
     }
 
     // HUD update (throttled)
@@ -1448,8 +1456,33 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private async broadcastState() {
+    const room = (window as any).sessionRoom as { code: string; playerId: string } | undefined;
+    if (!room?.code || !room?.playerId) return;
+    const levelInfo = getLevelInfo(this.state.prestige);
+    const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
+    try {
+      await fetch(`/api/rooms/${encodeURIComponent(room.code)}/heartbeat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          playerId: room.playerId,
+          currentRoom: roomName,
+          prestige: this.state.prestige,
+          energy: Math.round(this.state.energy),
+          stress: Math.round(this.state.stress || 0),
+          level: levelInfo.title ?? `Nível ${levelInfo.level}`,
+          completedMissions: this.state.completedMissions.length,
+          lastActivity: this.lastActivity,
+          shiftTime: Math.floor(this.state.gameTime / 60),
+        }),
+      });
+    } catch { /* silent — never interrupt gameplay */ }
+  }
+
   private openDialog(npc: NPC) {
     this.isDialogOpen = true;
+    this.lastActivity = `Falando com ${npc.def.name}`;
     const dialogue = npc.getDialogue(this.state);
     const prevProgress = { ...this.state.missionProgress };
     const prevCompleted = [...this.state.completedMissions];
