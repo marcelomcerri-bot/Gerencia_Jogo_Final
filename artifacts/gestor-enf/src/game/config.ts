@@ -19,6 +19,9 @@ export function createGameConfig(
     pixelArt: true,
     antialias: false,
     roundPixels: true,
+    render: {
+      preserveDrawingBuffer: true,
+    },
     physics: {
       default: 'arcade',
       arcade: {

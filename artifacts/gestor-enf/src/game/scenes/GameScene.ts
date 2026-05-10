@@ -1462,15 +1462,21 @@ export class GameScene extends Phaser.Scene {
     const levelInfo = getLevelInfo(this.state.prestige);
     const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
 
-    // Capture a low-res screenshot of the game canvas
+    // Capture a low-res screenshot of the game canvas.
+    // preserveDrawingBuffer is enabled in config so toDataURL works with WebGL.
     let screenshot: string | undefined;
     try {
       const src = this.game.canvas;
       const tmp = document.createElement('canvas');
       tmp.width = 480;
       tmp.height = 270;
-      tmp.getContext('2d')?.drawImage(src, 0, 0, 480, 270);
-      screenshot = tmp.toDataURL('image/jpeg', 0.3);
+      const ctx = tmp.getContext('2d');
+      if (ctx && src.width > 0 && src.height > 0) {
+        ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, 480, 270);
+        const dataUrl = tmp.toDataURL('image/jpeg', 0.35);
+        // Only use if it's a real image (not blank — blank gives a very short string)
+        if (dataUrl.length > 5000) screenshot = dataUrl;
+      }
     } catch { /* silent */ }
 
     try {
