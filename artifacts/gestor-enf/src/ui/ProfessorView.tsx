@@ -181,8 +181,22 @@ function LiveScreenPanel({
   const color = CARD_COLORS[index % CARD_COLORS.length];
   // WS online = real-time WebSocket frame arrived recently.
   // HTTP online = heartbeat arrived within 7s (Netlify fallback).
-  // Either counts as "online" so the overlay never covers active students.
   const isOnline = player.wsOnline || player.online;
+
+  // Timestamp that refreshes every 600ms to bust the browser cache and force
+  // a new fetch of the screenshot image from the dedicated endpoint.
+  const [ts, setTs] = useState(() => Date.now());
+  useEffect(() => {
+    if (!isOnline) return;
+    const id = setInterval(() => setTs(Date.now()), 600);
+    return () => clearInterval(id);
+  }, [isOnline]);
+
+  // Live WS blob URL takes priority; HTTP screenshot URL used as fallback
+  const imgSrc = player.blobUrl
+    ?? (isOnline ? `/__rooms/GLOBAL/screenshot/${player.playerId}?t=${ts}` : null)
+    ?? player.httpScreenshot
+    ?? null;
 
   return (
     <motion.div
@@ -198,9 +212,9 @@ function LiveScreenPanel({
         aspectRatio: "16/9",
       }}
     >
-      {player.blobUrl || player.httpScreenshot ? (
+      {imgSrc ? (
         <img
-          src={player.blobUrl ?? player.httpScreenshot}
+          src={imgSrc}
           alt={`Tela de ${player.playerName}`}
           className="w-full h-full"
           style={{ display: "block", objectFit: "fill" }}

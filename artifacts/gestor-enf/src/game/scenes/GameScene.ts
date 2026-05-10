@@ -46,10 +46,10 @@ export class GameScene extends Phaser.Scene {
   private _screenFrameRAF: number = 0;
   private _screenEncoding = false;
 
-  // HTTP fallback: when WS is unavailable (e.g. Netlify), include screenshots in heartbeat
+  // HTTP fallback: when WS is unavailable (e.g. Netlify), post screenshots to dedicated endpoint
   private _screenShareFallback = false;
-  private _pendingScreenshot: string | null = null;
   private _screenshotInterval: ReturnType<typeof setInterval> | null = null;
+  private _screenshotBusy = false; // prevent overlapping encodes
 
   // Ambient lights/decor
   private darkOverlay!: Phaser.GameObjects.RenderTexture;
@@ -1540,29 +1540,38 @@ export class GameScene extends Phaser.Scene {
 
   private _startFallbackCapture() {
     if (this._screenshotInterval) return;
-    this._screenshotInterval = setInterval(() => this._captureFallbackScreenshot(), 2500);
+    // 500 ms — best achievable on Netlify serverless (~2 fps after blob round-trip)
+    this._screenshotInterval = setInterval(() => this._captureFallbackScreenshot(), 500);
   }
 
   private async _captureFallbackScreenshot() {
+    if (this._screenshotBusy) return; // previous encode still in flight
+    const room = (window as any).sessionRoom as { code: string; playerId: string } | undefined;
+    if (!room?.code || !room?.playerId) return;
+    const src = this.game.canvas;
+    if (!src || src.width === 0 || src.height === 0) return;
+    this._screenshotBusy = true;
     try {
-      const src = this.game.canvas;
-      if (!src || src.width === 0 || src.height === 0) return;
+      // 640×360 at quality 0.50 gives clear visuals (~15-40 KB raw JPEG)
       const bitmap = await createImageBitmap(src, {
-        resizeWidth: 320,
-        resizeHeight: 180,
-        resizeQuality: 'low',
+        resizeWidth: 640,
+        resizeHeight: 360,
+        resizeQuality: 'medium',
       });
-      const offscreen = new OffscreenCanvas(320, 180);
+      const offscreen = new OffscreenCanvas(640, 360);
       offscreen.getContext('2d')!.drawImage(bitmap, 0, 0);
       bitmap.close();
-      const blob = await offscreen.convertToBlob({ type: 'image/jpeg', quality: 0.28 });
-      if (blob.size < 500 || blob.size > 55000) return;
-      const ab = await blob.arrayBuffer();
-      const bytes = new Uint8Array(ab);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      this._pendingScreenshot = 'data:image/jpeg;base64,' + btoa(binary);
-    } catch { /* silent — never interrupt gameplay */ }
+      const blob = await offscreen.convertToBlob({ type: 'image/jpeg', quality: 0.50 });
+      if (blob.size < 1000 || blob.size > 200_000) return;
+      // POST raw JPEG binary directly — no base64 encoding on the client
+      fetch(`/__rooms/${encodeURIComponent(room.code)}/screenshot/${encodeURIComponent(room.playerId)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: blob,
+      }).catch(() => {}); // fire-and-forget, never interrupt gameplay
+    } catch { /* silent */ } finally {
+      this._screenshotBusy = false;
+    }
   }
 
   // rAF capture loop — encodes async via OffscreenCanvas so the game loop
@@ -1654,11 +1663,6 @@ export class GameScene extends Phaser.Scene {
         lastActivity: this.lastActivity,
         shiftTime: Math.floor(this.state.gameTime / 60),
       };
-      // In HTTP fallback mode, include screenshot in heartbeat for live view
-      if (this._screenShareFallback && this._pendingScreenshot) {
-        payload.screenshot = this._pendingScreenshot;
-        this._pendingScreenshot = null;
-      }
       const res = await fetch(`/__rooms/${encodeURIComponent(room.code)}/heartbeat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
