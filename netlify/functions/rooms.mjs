@@ -9,6 +9,9 @@
  * across instances, Netlify typically reuses the same warm instance for
  * low-traffic classroom sessions, making this reliable for a single class.
  * Players inactive for >90 s are purged on every request.
+ *
+ * Note: the WebSocket screen-share endpoint (/__screen-ws) is not available
+ * in this deployment — live view falls back to HTTP polling only.
  */
 
 const rooms = new Map();
@@ -25,6 +28,8 @@ function cleanup() {
 
 const CORS = {
   "Content-Type": "application/json",
+  "Cache-Control": "no-store, no-cache, must-revalidate",
+  "Pragma": "no-cache",
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
@@ -35,7 +40,19 @@ export default async function handler(req, context) {
     return new Response(null, { status: 204, headers: CORS });
   }
 
-  const { roomCode, action } = context.params ?? {};
+  // v2 config.path populates context.params when routed via path config.
+  // Fall back to parsing from req.url for robustness.
+  let roomCode = context.params?.roomCode;
+  let action   = context.params?.action;
+
+  if (!roomCode || !action) {
+    try {
+      const pathname = new URL(req.url).pathname;
+      const m = pathname.match(/\/__rooms\/([^/]+)\/([^/]+)/);
+      if (m) { roomCode = m[1]; action = m[2]; }
+    } catch { /* ignore */ }
+  }
+
   if (!roomCode || !action) {
     return new Response(JSON.stringify({ error: "Not found" }), {
       status: 404,
@@ -53,7 +70,7 @@ export default async function handler(req, context) {
     const now = Date.now();
     const players = [...room.values()].map((p) => ({
       ...p,
-      online: now - p.lastSeen < 20000,
+      online: now - p.lastSeen < 7000,
     }));
     return new Response(JSON.stringify({ players }), { headers: CORS });
   }
@@ -96,7 +113,9 @@ export default async function handler(req, context) {
       });
     }
     const player = room.get(playerId);
-    room.set(playerId, { ...player, ...data, lastSeen: Date.now() });
+    // Exclude screenshot from heartbeat storage (large payload, live view uses WS)
+    const { screenshot: _drop, ...rest } = data;
+    room.set(playerId, { ...player, ...rest, lastSeen: Date.now() });
     return new Response(JSON.stringify({ ok: true }), { headers: CORS });
   }
 

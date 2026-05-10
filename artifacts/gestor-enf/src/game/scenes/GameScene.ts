@@ -1523,7 +1523,7 @@ export class GameScene extends Phaser.Scene {
     this._screenFrameTimer = setTimeout(() => {
       this._sendScreenFrame();
       this._scheduleNextFrame();
-    }, 66); // ~15 fps — fast enough to look smooth, light enough not to stutter
+    }, 40); // 25 fps — noticeably smoother motion
   }
 
   private _sendScreenFrame() {
