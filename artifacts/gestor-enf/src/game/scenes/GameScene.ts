@@ -1636,7 +1636,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private async broadcastState() {
-    const room = (window as any).sessionRoom as { code: string; playerId: string } | undefined;
+    const room = (window as any).sessionRoom as { code: string; playerId: string; playerName?: string } | undefined;
     if (!room?.code || !room?.playerId) return;
     const levelInfo = getLevelInfo(this.state.prestige);
     const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
@@ -1657,11 +1657,16 @@ export class GameScene extends Phaser.Scene {
         payload.screenshot = this._pendingScreenshot;
         this._pendingScreenshot = null;
       }
-      await fetch(`/__rooms/${encodeURIComponent(room.code)}/heartbeat`, {
+      const res = await fetch(`/__rooms/${encodeURIComponent(room.code)}/heartbeat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      // If the server lost our state (e.g. after a Netlify cold start), re-register
+      if (res.status === 404) {
+        const register = (window as any).__registerInRoom as ((code: string, name: string) => Promise<boolean>) | undefined;
+        if (register) await register(room.code, room.playerName ?? 'Estudante');
+      }
     } catch { /* silent — never interrupt gameplay */ }
   }
 

@@ -1,30 +1,17 @@
 /**
  * Netlify Function v2 — Room API for Modo Professor
  *
+ * Uses Netlify Blobs for persistent state across function instances.
+ * Each player is stored under key "${roomCode}::${playerId}".
+ *
  * Handles: GET  /__rooms/:roomCode/players
  *          POST /__rooms/:roomCode/join
  *          POST /__rooms/:roomCode/heartbeat
- *
- * State is kept in module-level memory. While serverless functions can scale
- * across instances, Netlify typically reuses the same warm instance for
- * low-traffic classroom sessions, making this reliable for a single class.
- * Players inactive for >90 s are purged on every request.
- *
- * Note: the WebSocket screen-share endpoint (/__screen-ws) is not available
- * in this deployment — live view falls back to HTTP polling only.
  */
 
-const rooms = new Map();
+import { getStore } from "@netlify/blobs";
 
-function cleanup() {
-  const now = Date.now();
-  for (const [code, players] of rooms) {
-    for (const [id, p] of players) {
-      if (now - p.lastSeen > 90000) players.delete(id);
-    }
-    if (players.size === 0) rooms.delete(code);
-  }
-}
+const STALE_MS = 90_000;
 
 const CORS = {
   "Content-Type": "application/json",
@@ -40,8 +27,6 @@ export default async function handler(req, context) {
     return new Response(null, { status: 204, headers: CORS });
   }
 
-  // v2 config.path populates context.params when routed via path config.
-  // Fall back to parsing from req.url for robustness.
   let roomCode = context.params?.roomCode;
   let action   = context.params?.action;
 
@@ -60,37 +45,42 @@ export default async function handler(req, context) {
     });
   }
 
-  cleanup();
-
-  if (!rooms.has(roomCode)) rooms.set(roomCode, new Map());
-  const room = rooms.get(roomCode);
+  const store = getStore("rooms");
+  const now = Date.now();
+  const prefix = `${roomCode}::`;
 
   // ── GET /__rooms/:roomCode/players ────────────────────────────────────────
   if (req.method === "GET" && action === "players") {
-    const now = Date.now();
-    const players = [...room.values()].map((p) => ({
-      ...p,
-      online: now - p.lastSeen < 7000,
-    }));
-    return new Response(JSON.stringify({ players }), { headers: CORS });
+    try {
+      const { blobs } = await store.list({ prefix });
+      const all = await Promise.all(
+        blobs.map((b) => store.get(b.key, { type: "json" }).catch(() => null))
+      );
+      const players = all
+        .filter((p) => p !== null && now - p.lastSeen < STALE_MS)
+        .map((p) => ({ ...p, online: now - p.lastSeen < 7000 }));
+      return new Response(JSON.stringify({ players }), { headers: CORS });
+    } catch (e) {
+      return new Response(JSON.stringify({ players: [], _error: String(e) }), {
+        headers: CORS,
+      });
+    }
   }
 
   // ── POST endpoints — parse body ───────────────────────────────────────────
   let data = {};
   try {
     data = await req.json();
-  } catch {
-    /* ignore parse errors */
-  }
+  } catch { /* ignore */ }
 
   // ── POST /__rooms/:roomCode/join ──────────────────────────────────────────
   if (req.method === "POST" && action === "join") {
     const playerName = (data.playerName || "Estudante").slice(0, 32);
-    const playerId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    room.set(playerId, {
+    const playerId = `${now}-${Math.random().toString(36).slice(2, 8)}`;
+    const player = {
       playerId,
       playerName,
-      lastSeen: Date.now(),
+      lastSeen: now,
       currentRoom: "Corredor",
       prestige: 0,
       energy: 100,
@@ -99,27 +89,33 @@ export default async function handler(req, context) {
       completedMissions: 0,
       lastActivity: "Iniciou o jogo",
       shiftTime: 0,
-    });
+    };
+    await store.set(`${prefix}${playerId}`, JSON.stringify(player));
     return new Response(JSON.stringify({ playerId }), { headers: CORS });
   }
 
   // ── POST /__rooms/:roomCode/heartbeat ─────────────────────────────────────
   if (req.method === "POST" && action === "heartbeat") {
-    const playerId = data.playerId;
-    if (!playerId || !room.has(playerId)) {
+    const { playerId, screenshot, ...rest } = data;
+    if (!playerId) {
+      return new Response(JSON.stringify({ error: "Missing playerId" }), {
+        status: 400,
+        headers: CORS,
+      });
+    }
+    const key = `${prefix}${playerId}`;
+    const existing = await store.get(key, { type: "json" }).catch(() => null);
+    if (!existing) {
       return new Response(JSON.stringify({ error: "Player not found" }), {
         status: 404,
         headers: CORS,
       });
     }
-    const player = room.get(playerId);
-    // Store screenshot only if it's a reasonable size (HTTP fallback for live view)
-    const { screenshot, ...rest } = data;
-    const update = { ...player, ...rest, lastSeen: Date.now() };
-    if (typeof screenshot === "string" && screenshot.length < 80000) {
+    const update = { ...existing, ...rest, lastSeen: now };
+    if (typeof screenshot === "string" && screenshot.length < 80_000) {
       update.screenshot = screenshot;
     }
-    room.set(playerId, update);
+    await store.set(key, JSON.stringify(update));
     return new Response(JSON.stringify({ ok: true }), { headers: CORS });
   }
 

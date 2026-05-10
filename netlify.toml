@@ -8,7 +8,7 @@
   PNPM_VERSION = "10"
 
 [functions]
-  node_bundler = "none"
+  node_bundler = "esbuild"
 
 # SPA fallback — all other paths serve index.html for client-side routing.
 # The rooms API is served directly by the v2 function via its config.path

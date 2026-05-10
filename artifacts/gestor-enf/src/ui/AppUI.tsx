@@ -23,26 +23,29 @@ function getOrCreatePlayerId(): string {
   return id;
 }
 
-async function registerInGlobalRoom() {
-  const playerId = getOrCreatePlayerId();
-  const playerName = `Estudante`;
+async function registerInRoom(roomCode: string, playerName: string): Promise<boolean> {
   try {
-    // Use PUT-style upsert: join always re-registers with the same stored ID.
-    // Since our API generates a new ID, we track ours separately and send
-    // heartbeats using window.sessionRoom which is set here.
-    const res = await fetch("/__rooms/GLOBAL/join", {
+    const res = await fetch(`/__rooms/${encodeURIComponent(roomCode)}/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ playerName }),
     });
     if (res.ok) {
       const data = await res.json();
-      (window as any).sessionRoom = { code: "GLOBAL", playerId: data.playerId };
+      (window as any).sessionRoom = { code: roomCode, playerId: data.playerId, playerName };
+      return true;
     }
-  } catch {
-    // silent — professor mode is optional, game works without it
-  }
+  } catch { /* silent */ }
+  return false;
 }
+
+async function registerInGlobalRoom() {
+  const playerName = `Estudante`;
+  await registerInRoom("GLOBAL", playerName);
+}
+
+// Exposed globally so GameScene can call it on heartbeat 404
+(window as any).__registerInRoom = registerInRoom;
 
 export function AppUI({
   onStartGame,
