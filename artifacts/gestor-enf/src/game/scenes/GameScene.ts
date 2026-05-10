@@ -43,7 +43,8 @@ export class GameScene extends Phaser.Scene {
 
   // WebSocket screen-share stream
   private _screenWs: WebSocket | null = null;
-  private _screenFrameTimer: ReturnType<typeof setTimeout> | null = null;
+  private _screenFrameRAF: number = 0;
+  private _screenEncoding = false;
 
   // Ambient lights/decor
   private darkOverlay!: Phaser.GameObjects.RenderTexture;
@@ -1497,13 +1498,14 @@ export class GameScene extends Phaser.Scene {
     this._screenWs = ws;
 
     ws.onopen = () => {
-      this._scheduleNextFrame();
+      this._startFrameCapture();
     };
 
     ws.onclose = () => {
       this._screenWs = null;
-      if (this._screenFrameTimer) { clearTimeout(this._screenFrameTimer); this._screenFrameTimer = null; }
-      // Auto-reconnect
+      if (this._screenFrameRAF) { cancelAnimationFrame(this._screenFrameRAF); this._screenFrameRAF = 0; }
+      this._screenEncoding = false;
+      // Auto-reconnect after 2s
       setTimeout(() => {
         const room = (window as any).sessionRoom as { code: string; playerId: string; playerName?: string } | undefined;
         if (room?.code && room?.playerId) {
@@ -1515,49 +1517,49 @@ export class GameScene extends Phaser.Scene {
     ws.onerror = () => ws.close();
   }
 
-  // Use recursive setTimeout so a new frame is never scheduled until the
-  // previous send (and encode) has fully completed — prevents overlap and
-  // ensures the game's JS thread isn't choked by back-to-back encodes.
-  private _scheduleNextFrame() {
-    if (!this._screenWs || this._screenWs.readyState !== WebSocket.OPEN) return;
-    this._screenFrameTimer = setTimeout(() => {
-      this._sendScreenFrame();
-      this._scheduleNextFrame();
-    }, 40); // 25 fps — noticeably smoother motion
+  // rAF capture loop — encodes async via OffscreenCanvas so the game loop
+  // is never blocked. Only one encode in flight at a time (_screenEncoding flag).
+  private _startFrameCapture() {
+    const loop = () => {
+      this._screenFrameRAF = requestAnimationFrame(loop);
+      const ws = this._screenWs;
+      if (!ws || ws.readyState !== WebSocket.OPEN || this._screenEncoding) return;
+      if (ws.bufferedAmount > 24576) return; // 24 KB: drop frame if buffer building up
+      this._screenEncoding = true;
+      this._captureAndSendFrame(ws).finally(() => { this._screenEncoding = false; });
+    };
+    this._screenFrameRAF = requestAnimationFrame(loop);
   }
 
-  private _sendScreenFrame() {
-    const ws = this._screenWs;
-    if (!ws || ws.readyState !== WebSocket.OPEN) return;
-
-    // KEY: if the send buffer has data queued, drop this frame entirely.
-    // Without this guard, slow connections build a growing backlog and the
-    // professor sees frames that are minutes old.
-    if (ws.bufferedAmount > 32768) return; // 32 KB threshold
-
+  private async _captureAndSendFrame(ws: WebSocket) {
     try {
       const src = this.game.canvas;
       if (!src || src.width === 0 || src.height === 0) return;
 
-      // Encode at 640×360 — half of 720p but still HD.
-      // toDataURL on a 640×360 canvas takes ~8–15 ms vs ~80–120 ms for 1280×720,
-      // so it no longer blocks Phaser's game loop noticeably.
-      const tmp = document.createElement('canvas');
-      tmp.width = 640;
-      tmp.height = 360;
-      const ctx = tmp.getContext('2d');
-      if (!ctx) return;
-      ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, 640, 360);
-      const dataUrl = tmp.toDataURL('image/jpeg', 0.72);
-      if (dataUrl.length < 4000) return; // blank/black frame — skip
+      // createImageBitmap with resize runs off the main thread — zero game impact.
+      const bitmap = await createImageBitmap(src, {
+        resizeWidth: 512,
+        resizeHeight: 288,
+        resizeQuality: 'medium',
+      });
 
+      // convertToBlob (JPEG encode) also runs off main thread.
+      const offscreen = new OffscreenCanvas(512, 288);
+      offscreen.getContext('2d')!.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      const blob = await offscreen.convertToBlob({ type: 'image/jpeg', quality: 0.8 });
+
+      // Re-check after async work
+      if (!this._screenWs || this._screenWs.readyState !== WebSocket.OPEN) return;
+      if (this._screenWs.bufferedAmount > 24576) return;
+      if (blob.size < 2000) return; // blank frame guard
+
+      // Build binary frame: [uint32 headerLen LE][JSON header bytes][JPEG bytes]
       const levelInfo = getLevelInfo(this.state.prestige);
-      const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
-      ws.send(JSON.stringify({
+      const header = {
         type: 'frame',
-        screenshot: dataUrl,
         stats: {
-          currentRoom: roomName,
+          currentRoom: ROOM_NAMES[this.currentRoom] || 'Corredor',
           prestige: this.state.prestige,
           energy: Math.round(this.state.energy),
           stress: Math.round(this.state.stress || 0),
@@ -1566,13 +1568,23 @@ export class GameScene extends Phaser.Scene {
           lastActivity: this.lastActivity,
           shiftTime: Math.floor(this.state.gameTime / 60),
         },
-      }));
-    } catch { /* silent */ }
+      };
+      const headerBytes = new TextEncoder().encode(JSON.stringify(header));
+      const jpegBytes = new Uint8Array(await blob.arrayBuffer());
+
+      const combined = new Uint8Array(4 + headerBytes.length + jpegBytes.length);
+      new DataView(combined.buffer).setUint32(0, headerBytes.length, true);
+      combined.set(headerBytes, 4);
+      combined.set(jpegBytes, 4 + headerBytes.length);
+
+      this._screenWs.send(combined.buffer);
+    } catch { /* silent — never interrupt gameplay */ }
   }
 
   private _destroyScreenShare() {
-    if (this._screenFrameTimer) { clearTimeout(this._screenFrameTimer); this._screenFrameTimer = null; }
+    if (this._screenFrameRAF) { cancelAnimationFrame(this._screenFrameRAF); this._screenFrameRAF = 0; }
     if (this._screenWs) { this._screenWs.onclose = null; this._screenWs.close(); this._screenWs = null; }
+    this._screenEncoding = false;
   }
 
   private async broadcastState() {

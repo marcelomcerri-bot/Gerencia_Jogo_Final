@@ -17,7 +17,7 @@ interface PlayerData {
 }
 
 interface LivePlayerData extends PlayerData {
-  screenshot?: string;
+  blobUrl?: string;
   wsOnline: boolean;
 }
 
@@ -193,9 +193,9 @@ function LiveScreenPanel({
         aspectRatio: "16/9",
       }}
     >
-      {player.screenshot ? (
+      {player.blobUrl ? (
         <img
-          src={player.screenshot}
+          src={player.blobUrl}
           alt={`Tela de ${player.playerName}`}
           className="w-full h-full"
           style={{ display: "block", objectFit: "fill" }}
@@ -295,7 +295,7 @@ function LiveScreenPanel({
 interface WsFrame {
   playerId: string;
   playerName: string;
-  screenshot: string;
+  blobUrl: string;   // object URL — revoke when replacing
   currentRoom?: string;
   prestige?: number;
   energy?: number;
@@ -313,8 +313,9 @@ export function ProfessorView() {
   const [error, setError] = useState("");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<"dashboard" | "live">("dashboard");
+  const [wsUnavailable, setWsUnavailable] = useState(false);
 
-  // WebSocket live frames: playerId → latest WsFrame
+  // WebSocket live frames: playerId → latest WsFrame (blob URLs, not base64)
   const wsFramesRef = useRef<Map<string, WsFrame>>(new Map());
   const [, forceRender] = useReducer((x: number) => x + 1, 0);
   const rafRef = useRef<number>(0);
@@ -336,41 +337,80 @@ export function ProfessorView() {
       return;
     }
 
+    setWsUnavailable(false);
     let ws: WebSocket;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let failTimer: ReturnType<typeof setTimeout> | null = null;
     let alive = true;
+    let everConnected = false;
 
     const connect = () => {
       if (!alive) return;
       const proto = location.protocol === "https:" ? "wss:" : "ws:";
       ws = new WebSocket(`${proto}//${location.host}/__screen-ws?role=professor`);
+      ws.binaryType = "arraybuffer";
       wsRef.current = ws;
 
+      // If we never get a successful open within 6 s, flag as unavailable (Netlify)
+      failTimer = setTimeout(() => {
+        if (!everConnected) setWsUnavailable(true);
+      }, 6000);
+
+      ws.onopen = () => {
+        everConnected = true;
+        if (failTimer) { clearTimeout(failTimer); failTimer = null; }
+        setWsUnavailable(false);
+      };
+
       ws.onmessage = (ev) => {
-        try {
-          const msg = JSON.parse(ev.data as string) as { type: string } & Record<string, unknown>;
-          if (msg.type === "frame") {
-            const f = msg as unknown as Omit<WsFrame, "ts"> & { stats?: Record<string, unknown> };
-            wsFramesRef.current.set(f.playerId, {
-              playerId: f.playerId,
-              playerName: f.playerName,
-              screenshot: f.screenshot,
-              currentRoom: (f.stats?.currentRoom ?? f.currentRoom) as string | undefined,
-              prestige: (f.stats?.prestige ?? f.prestige) as number | undefined,
-              energy: (f.stats?.energy ?? f.energy) as number | undefined,
-              stress: (f.stats?.stress ?? f.stress) as number | undefined,
-              level: (f.stats?.level ?? f.level) as string | undefined,
-              completedMissions: (f.stats?.completedMissions ?? f.completedMissions) as number | undefined,
-              lastActivity: (f.stats?.lastActivity ?? f.lastActivity) as string | undefined,
-              shiftTime: (f.stats?.shiftTime ?? f.shiftTime) as number | undefined,
+        // Binary frame: [uint32 headerLen LE][JSON header bytes][JPEG bytes]
+        if (ev.data instanceof ArrayBuffer) {
+          try {
+            const ab = ev.data;
+            if (ab.byteLength < 4) return;
+            const headerLen = new DataView(ab).getUint32(0, true);
+            if (4 + headerLen > ab.byteLength) return;
+            const headerStr = new TextDecoder().decode(new Uint8Array(ab, 4, headerLen));
+            const header = JSON.parse(headerStr) as Record<string, unknown>;
+            if (header.type !== "frame") return;
+            const jpegBytes = new Uint8Array(ab, 4 + headerLen);
+            if (jpegBytes.length < 100) return; // guard against empty frames
+
+            // Revoke previous blob URL to avoid memory leak
+            const prev = wsFramesRef.current.get(header.playerId as string);
+            if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl);
+
+            const blob = new Blob([jpegBytes], { type: "image/jpeg" });
+            const blobUrl = URL.createObjectURL(blob);
+
+            wsFramesRef.current.set(header.playerId as string, {
+              playerId: header.playerId as string,
+              playerName: header.playerName as string,
+              blobUrl,
+              currentRoom: header.currentRoom as string | undefined,
+              prestige: header.prestige as number | undefined,
+              energy: header.energy as number | undefined,
+              stress: header.stress as number | undefined,
+              level: header.level as string | undefined,
+              completedMissions: header.completedMissions as number | undefined,
+              lastActivity: header.lastActivity as string | undefined,
+              shiftTime: header.shiftTime as number | undefined,
               ts: Date.now(),
             });
             scheduleRender();
-          } else if (msg.type === "leave") {
-            wsFramesRef.current.delete(msg.playerId as string);
-            scheduleRender();
-          }
-        } catch { /* ignore */ }
+          } catch { /* ignore */ }
+        } else if (typeof ev.data === "string") {
+          // JSON control messages (leave etc.)
+          try {
+            const msg = JSON.parse(ev.data) as Record<string, unknown>;
+            if (msg.type === "leave") {
+              const prev = wsFramesRef.current.get(msg.playerId as string);
+              if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl);
+              wsFramesRef.current.delete(msg.playerId as string);
+              scheduleRender();
+            }
+          } catch { /* ignore */ }
+        }
       };
 
       ws.onclose = () => {
@@ -385,8 +425,14 @@ export function ProfessorView() {
     return () => {
       alive = false;
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (failTimer) clearTimeout(failTimer);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (wsRef.current) { wsRef.current.onclose = null; wsRef.current.close(); wsRef.current = null; }
+      // Revoke all blob URLs on unmount
+      for (const frame of wsFramesRef.current.values()) {
+        if (frame.blobUrl) URL.revokeObjectURL(frame.blobUrl);
+      }
+      wsFramesRef.current.clear();
     };
   }, [viewMode, scheduleRender]);
 
@@ -440,7 +486,7 @@ export function ProfessorView() {
         completedMissions: frame?.completedMissions ?? httpP?.completedMissions ?? 0,
         lastActivity: frame?.lastActivity ?? httpP?.lastActivity ?? "—",
         shiftTime: frame?.shiftTime ?? httpP?.shiftTime ?? 0,
-        screenshot: frame?.screenshot,
+        blobUrl: frame?.blobUrl,
       };
     });
   })();
@@ -570,6 +616,18 @@ export function ProfessorView() {
                 <PlayerCard key={p.playerId} player={p} index={i} />
               ))}
             </AnimatePresence>
+          </div>
+        ) : wsUnavailable ? (
+          <div className="flex flex-col items-center justify-center h-full gap-4">
+            <div className="text-6xl opacity-30">📡</div>
+            <p className="font-mono text-lg" style={{ color: "#f39c12" }}>
+              Transmissão ao vivo indisponível
+            </p>
+            <p className="font-mono text-sm text-gray-500 text-center max-w-sm">
+              Esta hospedagem não suporta WebSocket persistente.
+              <br />
+              Use o <strong className="text-gray-300">Dashboard</strong> para acompanhar os alunos em tempo real.
+            </p>
           </div>
         ) : (
           <div

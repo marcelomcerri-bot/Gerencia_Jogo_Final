@@ -138,8 +138,30 @@ function roomApiPlugin(): Plugin {
 interface WsStudentEntry {
   ws: WsSocket;
   playerName: string;
-  latestFrame?: string;
+  latestJpeg?: Buffer;
   latestStats?: Record<string, unknown>;
+}
+
+// Binary frame protocol (both directions):
+//   [4 bytes uint32 LE: headerLen][JSON header bytes][JPEG bytes]
+function buildBinaryFrame(header: Record<string, unknown>, jpeg: Buffer): Buffer {
+  const headerBytes = Buffer.from(JSON.stringify(header), "utf8");
+  const out = Buffer.allocUnsafe(4 + headerBytes.length + jpeg.length);
+  out.writeUInt32LE(headerBytes.length, 0);
+  headerBytes.copy(out, 4);
+  jpeg.copy(out, 4 + headerBytes.length);
+  return out;
+}
+
+function parseBinaryFrame(raw: Buffer): { header: Record<string, unknown>; jpeg: Buffer } | null {
+  try {
+    if (raw.length < 4) return null;
+    const headerLen = raw.readUInt32LE(0);
+    if (4 + headerLen > raw.length) return null;
+    const header = JSON.parse(raw.subarray(4, 4 + headerLen).toString("utf8")) as Record<string, unknown>;
+    const jpeg = raw.subarray(4 + headerLen);
+    return { header, jpeg };
+  } catch { return null; }
 }
 
 function screenSharePlugin(): Plugin {
@@ -162,18 +184,15 @@ function screenSharePlugin(): Plugin {
         if (role === "professor") {
           professors.add(ws);
 
+          // Send each student's latest frame to the new professor
           for (const [pid, student] of students) {
-            if (student.latestFrame && ws.readyState === WsSocket.OPEN) {
+            if (student.latestJpeg && ws.readyState === WsSocket.OPEN) {
               try {
-                ws.send(
-                  JSON.stringify({
-                    type: "frame",
-                    playerId: pid,
-                    playerName: student.playerName,
-                    screenshot: student.latestFrame,
-                    ...(student.latestStats ?? {}),
-                  })
+                const outBuf = buildBinaryFrame(
+                  { type: "frame", playerId: pid, playerName: student.playerName, ...(student.latestStats ?? {}) },
+                  student.latestJpeg
                 );
+                ws.send(outBuf);
               } catch { /* ignore */ }
             }
           }
@@ -184,34 +203,30 @@ function screenSharePlugin(): Plugin {
         } else if (role === "student" && playerId) {
           students.set(playerId, { ws, playerName });
 
-          ws.on("message", (raw: Buffer) => {
-            try {
-              const msg = JSON.parse(raw.toString()) as Record<string, unknown>;
-              const entry = students.get(playerId);
-              if (!entry) return;
+          ws.on("message", (raw: Buffer, isBinary: boolean) => {
+            const entry = students.get(playerId);
+            if (!entry) return;
 
-              if (msg.type === "frame") {
-                const screenshot = msg.screenshot as string;
-                entry.latestFrame = screenshot;
-                if (msg.stats) {
-                  entry.latestStats = msg.stats as Record<string, unknown>;
-                }
+            if (isBinary) {
+              const parsed = parseBinaryFrame(raw);
+              if (!parsed) return;
+              const { header, jpeg } = parsed;
+              if (header.type !== "frame") return;
 
-                const outStr = JSON.stringify({
-                  type: "frame",
-                  playerId,
-                  playerName: entry.playerName,
-                  screenshot,
-                  ...(entry.latestStats ?? {}),
-                });
+              entry.latestJpeg = jpeg;
+              if (header.stats) entry.latestStats = header.stats as Record<string, unknown>;
 
-                for (const prof of professors) {
-                  if (prof.readyState === WsSocket.OPEN) {
-                    try { prof.send(outStr); } catch { /* ignore */ }
-                  }
+              const outBuf = buildBinaryFrame(
+                { type: "frame", playerId, playerName: entry.playerName, ...(entry.latestStats ?? {}) },
+                jpeg
+              );
+
+              for (const prof of professors) {
+                if (prof.readyState === WsSocket.OPEN) {
+                  try { prof.send(outBuf); } catch { /* ignore */ }
                 }
               }
-            } catch { /* ignore */ }
+            }
           });
 
           const onLeave = () => {
