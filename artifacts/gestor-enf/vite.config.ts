@@ -5,6 +5,8 @@ import path from "path";
 import runtimeErrorModal from "@replit/vite-plugin-runtime-error-modal";
 import { cartographer } from "@replit/vite-plugin-cartographer";
 import type { Plugin } from "vite";
+import { WebSocketServer, WebSocket as WsSocket } from "ws";
+import type { IncomingMessage } from "http";
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
 const basePath = process.env.BASE_PATH || "/";
@@ -21,7 +23,6 @@ interface PlayerState {
   completedMissions: number;
   lastActivity: string;
   shiftTime: number;
-  screenshot?: string;
 }
 
 function roomApiPlugin(): Plugin {
@@ -132,12 +133,125 @@ function roomApiPlugin(): Plugin {
   };
 }
 
+interface WsStudentEntry {
+  ws: WsSocket;
+  playerName: string;
+  latestFrame?: string;
+  latestStats?: Record<string, unknown>;
+}
+
+function screenSharePlugin(): Plugin {
+  return {
+    name: "screen-share",
+    configureServer(server) {
+      const wss = new WebSocketServer({ noServer: true });
+      const students = new Map<string, WsStudentEntry>();
+      const professors = new Set<WsSocket>();
+
+      wss.on("connection", (ws: WsSocket, req: IncomingMessage) => {
+        const rawQuery = req.url?.includes("?")
+          ? req.url.split("?")[1]
+          : "";
+        const q = new URLSearchParams(rawQuery);
+        const role = q.get("role");
+        const playerId = q.get("id") ?? "";
+        const playerName = decodeURIComponent(q.get("name") ?? "Estudante");
+
+        if (role === "professor") {
+          professors.add(ws);
+
+          for (const [pid, student] of students) {
+            if (student.latestFrame && ws.readyState === WsSocket.OPEN) {
+              try {
+                ws.send(
+                  JSON.stringify({
+                    type: "frame",
+                    playerId: pid,
+                    playerName: student.playerName,
+                    screenshot: student.latestFrame,
+                    ...(student.latestStats ?? {}),
+                  })
+                );
+              } catch { /* ignore */ }
+            }
+          }
+
+          ws.on("close", () => professors.delete(ws));
+          ws.on("error", () => professors.delete(ws));
+
+        } else if (role === "student" && playerId) {
+          students.set(playerId, { ws, playerName });
+
+          ws.on("message", (raw: Buffer) => {
+            try {
+              const msg = JSON.parse(raw.toString()) as Record<string, unknown>;
+              const entry = students.get(playerId);
+              if (!entry) return;
+
+              if (msg.type === "frame") {
+                const screenshot = msg.screenshot as string;
+                entry.latestFrame = screenshot;
+                if (msg.stats) {
+                  entry.latestStats = msg.stats as Record<string, unknown>;
+                }
+
+                const outStr = JSON.stringify({
+                  type: "frame",
+                  playerId,
+                  playerName: entry.playerName,
+                  screenshot,
+                  ...(entry.latestStats ?? {}),
+                });
+
+                for (const prof of professors) {
+                  if (prof.readyState === WsSocket.OPEN) {
+                    try { prof.send(outStr); } catch { /* ignore */ }
+                  }
+                }
+              }
+            } catch { /* ignore */ }
+          });
+
+          const onLeave = () => {
+            students.delete(playerId);
+            const leaveStr = JSON.stringify({ type: "leave", playerId });
+            for (const prof of professors) {
+              if (prof.readyState === WsSocket.OPEN) {
+                try { prof.send(leaveStr); } catch { /* ignore */ }
+              }
+            }
+          };
+          ws.on("close", onLeave);
+          ws.on("error", onLeave);
+        }
+      });
+
+      server.httpServer!.on(
+        "upgrade",
+        (request: IncomingMessage, socket: unknown, head: Buffer) => {
+          if (request.url?.startsWith("/__screen-ws")) {
+            wss.handleUpgrade(
+              request,
+              socket as import("stream").Duplex,
+              head,
+              (ws) => {
+                wss.emit("connection", ws, request);
+              }
+            );
+          }
+        }
+      );
+    },
+  };
+}
+
 export default defineConfig({
   base: basePath,
   plugins: [
     react(),
     tailwindcss(),
     roomApiPlugin(),
+    screenSharePlugin(),
     ...(process.env.NODE_ENV !== "production"
       ? [runtimeErrorModal(), cartographer()]
       : []),
@@ -161,7 +275,6 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    // Phaser alone is ~1 MB; raise the warning threshold to avoid noise.
     chunkSizeWarningLimit: 2000,
   },
   server: {

@@ -41,6 +41,10 @@ export class GameScene extends Phaser.Scene {
   // Native interval handle — immune to Phaser clock throttling in background tabs
   private _heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
+  // WebSocket screen-share stream
+  private _screenWs: WebSocket | null = null;
+  private _screenFrameInterval: ReturnType<typeof setInterval> | null = null;
+
   // Ambient lights/decor
   private darkOverlay!: Phaser.GameObjects.RenderTexture;
   private glowBrush!: Phaser.GameObjects.Sprite;
@@ -78,14 +82,18 @@ export class GameScene extends Phaser.Scene {
     // Auto-save every 30s
     this.time.addEvent({ delay: 30000, loop: true, callback: () => saveGame(this.state) });
 
-    // Professor mode: use native setInterval so it keeps firing even when this
-    // tab is backgrounded (Phaser's own clock pauses/throttles in hidden tabs).
+    // Professor mode: heartbeat for stats (native setInterval → not throttled in background tabs)
     this._heartbeatInterval = setInterval(() => this.broadcastState(), 2500);
+
+    // Screen-share WebSocket: start connecting (retries until sessionRoom is ready)
+    this._initScreenShare();
+
     this.events.once(Phaser.Core.Events.DESTROY, () => {
       if (this._heartbeatInterval !== null) {
         clearInterval(this._heartbeatInterval);
         this._heartbeatInterval = null;
       }
+      this._destroyScreenShare();
     });
 
     // Schedule first crisis event (1-2 game minutes = 20-40s real)
@@ -1466,29 +1474,93 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  // ─── Screen-share WebSocket ───────────────────────────────────────────────
+
+  private _initScreenShare() {
+    const tryConnect = () => {
+      const room = (window as any).sessionRoom as { code: string; playerId: string; playerName?: string } | undefined;
+      if (this._screenWs) return; // already connected/connecting
+      if (room?.code && room?.playerId) {
+        this._connectScreenShare(room.playerId, room.playerName ?? 'Estudante');
+      } else {
+        setTimeout(tryConnect, 600);
+      }
+    };
+    setTimeout(tryConnect, 600);
+  }
+
+  private _connectScreenShare(playerId: string, playerName: string) {
+    if (this._screenWs) return;
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const url = `${proto}//${location.host}/__screen-ws?role=student&id=${encodeURIComponent(playerId)}&name=${encodeURIComponent(playerName)}`;
+    const ws = new WebSocket(url);
+    this._screenWs = ws;
+
+    ws.onopen = () => {
+      if (this._screenFrameInterval) clearInterval(this._screenFrameInterval);
+      // Send a frame immediately, then every 150 ms
+      this._sendScreenFrame();
+      this._screenFrameInterval = setInterval(() => this._sendScreenFrame(), 150);
+    };
+
+    ws.onclose = () => {
+      this._screenWs = null;
+      if (this._screenFrameInterval) { clearInterval(this._screenFrameInterval); this._screenFrameInterval = null; }
+      // Auto-reconnect
+      setTimeout(() => {
+        const room = (window as any).sessionRoom as { code: string; playerId: string; playerName?: string } | undefined;
+        if (room?.code && room?.playerId) {
+          this._connectScreenShare(room.playerId, room.playerName ?? 'Estudante');
+        }
+      }, 2000);
+    };
+
+    ws.onerror = () => ws.close();
+  }
+
+  private _sendScreenFrame() {
+    if (!this._screenWs || this._screenWs.readyState !== WebSocket.OPEN) return;
+    try {
+      const src = this.game.canvas;
+      if (!src || src.width === 0 || src.height === 0) return;
+      // Draw at full native canvas resolution — no downscale
+      const tmp = document.createElement('canvas');
+      tmp.width = src.width;
+      tmp.height = src.height;
+      const ctx = tmp.getContext('2d');
+      if (!ctx) return;
+      ctx.drawImage(src, 0, 0);
+      const dataUrl = tmp.toDataURL('image/jpeg', 0.78);
+      if (dataUrl.length < 5000) return; // blank/black frame — skip
+      const levelInfo = getLevelInfo(this.state.prestige);
+      const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
+      this._screenWs.send(JSON.stringify({
+        type: 'frame',
+        screenshot: dataUrl,
+        stats: {
+          currentRoom: roomName,
+          prestige: this.state.prestige,
+          energy: Math.round(this.state.energy),
+          stress: Math.round(this.state.stress || 0),
+          level: levelInfo.title ?? `Nível ${levelInfo.level}`,
+          completedMissions: this.state.completedMissions.length,
+          lastActivity: this.lastActivity,
+          shiftTime: Math.floor(this.state.gameTime / 60),
+        },
+      }));
+    } catch { /* silent */ }
+  }
+
+  private _destroyScreenShare() {
+    if (this._screenFrameInterval) { clearInterval(this._screenFrameInterval); this._screenFrameInterval = null; }
+    if (this._screenWs) { this._screenWs.onclose = null; this._screenWs.close(); this._screenWs = null; }
+  }
+
   private async broadcastState() {
     const room = (window as any).sessionRoom as { code: string; playerId: string } | undefined;
     if (!room?.code || !room?.playerId) return;
     const levelInfo = getLevelInfo(this.state.prestige);
     const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
-
-    // Capture a low-res screenshot of the game canvas.
-    // preserveDrawingBuffer is enabled in config so toDataURL works with WebGL.
-    let screenshot: string | undefined;
-    try {
-      const src = this.game.canvas;
-      const tmp = document.createElement('canvas');
-      tmp.width = 480;
-      tmp.height = 270;
-      const ctx = tmp.getContext('2d');
-      if (ctx && src.width > 0 && src.height > 0) {
-        ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, 480, 270);
-        const dataUrl = tmp.toDataURL('image/jpeg', 0.35);
-        // Only use if it's a real image (not blank — blank gives a very short string)
-        if (dataUrl.length > 5000) screenshot = dataUrl;
-      }
-    } catch { /* silent */ }
-
     try {
       await fetch(`/__rooms/${encodeURIComponent(room.code)}/heartbeat`, {
         method: 'POST',
@@ -1503,7 +1575,6 @@ export class GameScene extends Phaser.Scene {
           completedMissions: this.state.completedMissions.length,
           lastActivity: this.lastActivity,
           shiftTime: Math.floor(this.state.gameTime / 60),
-          screenshot,
         }),
       });
     } catch { /* silent — never interrupt gameplay */ }
