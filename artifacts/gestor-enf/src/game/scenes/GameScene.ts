@@ -46,6 +46,11 @@ export class GameScene extends Phaser.Scene {
   private _screenFrameRAF: number = 0;
   private _screenEncoding = false;
 
+  // HTTP fallback: when WS is unavailable (e.g. Netlify), include screenshots in heartbeat
+  private _screenShareFallback = false;
+  private _pendingScreenshot: string | null = null;
+  private _screenshotInterval: ReturnType<typeof setInterval> | null = null;
+
   // Ambient lights/decor
   private darkOverlay!: Phaser.GameObjects.RenderTexture;
   private glowBrush!: Phaser.GameObjects.Sprite;
@@ -1497,24 +1502,65 @@ export class GameScene extends Phaser.Scene {
     const ws = new WebSocket(url);
     this._screenWs = ws;
 
+    // If WS never opens within 6s, switch to HTTP screenshot fallback
+    const failTimer = setTimeout(() => {
+      if (ws.readyState !== WebSocket.OPEN) {
+        this._screenShareFallback = true;
+        ws.close();
+        this._startFallbackCapture();
+      }
+    }, 6000);
+
     ws.onopen = () => {
+      clearTimeout(failTimer);
+      this._screenShareFallback = false;
       this._startFrameCapture();
     };
 
     ws.onclose = () => {
+      clearTimeout(failTimer);
       this._screenWs = null;
       if (this._screenFrameRAF) { cancelAnimationFrame(this._screenFrameRAF); this._screenFrameRAF = 0; }
       this._screenEncoding = false;
-      // Auto-reconnect after 2s
-      setTimeout(() => {
-        const room = (window as any).sessionRoom as { code: string; playerId: string; playerName?: string } | undefined;
-        if (room?.code && room?.playerId) {
-          this._connectScreenShare(room.playerId, room.playerName ?? 'Estudante');
-        }
-      }, 2000);
+      // Only auto-reconnect WS if not in fallback mode
+      if (!this._screenShareFallback) {
+        setTimeout(() => {
+          const room = (window as any).sessionRoom as { code: string; playerId: string; playerName?: string } | undefined;
+          if (room?.code && room?.playerId) {
+            this._connectScreenShare(room.playerId, room.playerName ?? 'Estudante');
+          }
+        }, 2000);
+      }
     };
 
     ws.onerror = () => ws.close();
+  }
+
+  private _startFallbackCapture() {
+    if (this._screenshotInterval) return;
+    this._screenshotInterval = setInterval(() => this._captureFallbackScreenshot(), 2500);
+  }
+
+  private async _captureFallbackScreenshot() {
+    try {
+      const src = this.game.canvas;
+      if (!src || src.width === 0 || src.height === 0) return;
+      const bitmap = await createImageBitmap(src, {
+        resizeWidth: 320,
+        resizeHeight: 180,
+        resizeQuality: 'low',
+      });
+      const offscreen = new OffscreenCanvas(320, 180);
+      offscreen.getContext('2d')!.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      const blob = await offscreen.convertToBlob({ type: 'image/jpeg', quality: 0.28 });
+      if (blob.size < 500 || blob.size > 55000) return;
+      const ab = await blob.arrayBuffer();
+      const bytes = new Uint8Array(ab);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      this._pendingScreenshot = 'data:image/jpeg;base64,' + btoa(binary);
+    } catch { /* silent — never interrupt gameplay */ }
   }
 
   // rAF capture loop — encodes async via OffscreenCanvas so the game loop
@@ -1584,7 +1630,9 @@ export class GameScene extends Phaser.Scene {
   private _destroyScreenShare() {
     if (this._screenFrameRAF) { cancelAnimationFrame(this._screenFrameRAF); this._screenFrameRAF = 0; }
     if (this._screenWs) { this._screenWs.onclose = null; this._screenWs.close(); this._screenWs = null; }
+    if (this._screenshotInterval) { clearInterval(this._screenshotInterval); this._screenshotInterval = null; }
     this._screenEncoding = false;
+    this._pendingScreenshot = null;
   }
 
   private async broadcastState() {
@@ -1593,20 +1641,26 @@ export class GameScene extends Phaser.Scene {
     const levelInfo = getLevelInfo(this.state.prestige);
     const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
     try {
+      const payload: Record<string, unknown> = {
+        playerId: room.playerId,
+        currentRoom: roomName,
+        prestige: this.state.prestige,
+        energy: Math.round(this.state.energy),
+        stress: Math.round(this.state.stress || 0),
+        level: levelInfo.title ?? `Nível ${levelInfo.level}`,
+        completedMissions: this.state.completedMissions.length,
+        lastActivity: this.lastActivity,
+        shiftTime: Math.floor(this.state.gameTime / 60),
+      };
+      // In HTTP fallback mode, include screenshot in heartbeat for live view
+      if (this._screenShareFallback && this._pendingScreenshot) {
+        payload.screenshot = this._pendingScreenshot;
+        this._pendingScreenshot = null;
+      }
       await fetch(`/__rooms/${encodeURIComponent(room.code)}/heartbeat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          playerId: room.playerId,
-          currentRoom: roomName,
-          prestige: this.state.prestige,
-          energy: Math.round(this.state.energy),
-          stress: Math.round(this.state.stress || 0),
-          level: levelInfo.title ?? `Nível ${levelInfo.level}`,
-          completedMissions: this.state.completedMissions.length,
-          lastActivity: this.lastActivity,
-          shiftTime: Math.floor(this.state.gameTime / 60),
-        }),
+        body: JSON.stringify(payload),
       });
     } catch { /* silent — never interrupt gameplay */ }
   }

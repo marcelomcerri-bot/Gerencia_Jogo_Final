@@ -23,6 +23,7 @@ interface PlayerState {
   completedMissions: number;
   lastActivity: string;
   shiftTime: number;
+  screenshot?: string;
 }
 
 function roomApiPlugin(): Plugin {
@@ -120,11 +121,13 @@ function roomApiPlugin(): Plugin {
               return res.end(JSON.stringify({ error: "Player not found" }));
             }
             const player = room.get(playerId)!;
-            room.set(playerId, {
-              ...player,
-              ...(data as Partial<PlayerState>),
-              lastSeen: Date.now(),
-            });
+            const { screenshot, ...rest } = data as Partial<PlayerState> & { screenshot?: string };
+            const update: PlayerState = { ...player, ...rest, lastSeen: Date.now() };
+            // Store screenshot for HTTP live-view fallback (size-capped)
+            if (typeof screenshot === "string" && screenshot.length < 80000) {
+              update.screenshot = screenshot;
+            }
+            room.set(playerId, update);
             return res.end(JSON.stringify({ ok: true }));
           }
 

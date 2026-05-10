@@ -113,9 +113,13 @@ export default async function handler(req, context) {
       });
     }
     const player = room.get(playerId);
-    // Exclude screenshot from heartbeat storage (large payload, live view uses WS)
-    const { screenshot: _drop, ...rest } = data;
-    room.set(playerId, { ...player, ...rest, lastSeen: Date.now() });
+    // Store screenshot only if it's a reasonable size (HTTP fallback for live view)
+    const { screenshot, ...rest } = data;
+    const update = { ...player, ...rest, lastSeen: Date.now() };
+    if (typeof screenshot === "string" && screenshot.length < 80000) {
+      update.screenshot = screenshot;
+    }
+    room.set(playerId, update);
     return new Response(JSON.stringify({ ok: true }), { headers: CORS });
   }
 

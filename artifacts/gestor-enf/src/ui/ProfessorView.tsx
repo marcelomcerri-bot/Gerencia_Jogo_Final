@@ -14,11 +14,13 @@ interface PlayerData {
   completedMissions: number;
   lastActivity: string;
   shiftTime: number;
+  screenshot?: string;
 }
 
 interface LivePlayerData extends PlayerData {
   blobUrl?: string;
   wsOnline: boolean;
+  httpScreenshot?: string;
 }
 
 const CARD_COLORS = [
@@ -193,9 +195,9 @@ function LiveScreenPanel({
         aspectRatio: "16/9",
       }}
     >
-      {player.blobUrl ? (
+      {player.blobUrl || player.httpScreenshot ? (
         <img
-          src={player.blobUrl}
+          src={player.blobUrl ?? player.httpScreenshot}
           alt={`Tela de ${player.playerName}`}
           className="w-full h-full"
           style={{ display: "block", objectFit: "fill" }}
@@ -487,6 +489,7 @@ export function ProfessorView() {
         lastActivity: frame?.lastActivity ?? httpP?.lastActivity ?? "—",
         shiftTime: frame?.shiftTime ?? httpP?.shiftTime ?? 0,
         blobUrl: frame?.blobUrl,
+        httpScreenshot: httpP?.screenshot,
       };
     });
   })();
@@ -617,28 +620,27 @@ export function ProfessorView() {
               ))}
             </AnimatePresence>
           </div>
-        ) : wsUnavailable ? (
-          <div className="flex flex-col items-center justify-center h-full gap-4">
-            <div className="text-6xl opacity-30">📡</div>
-            <p className="font-mono text-lg" style={{ color: "#f39c12" }}>
-              Transmissão ao vivo indisponível
-            </p>
-            <p className="font-mono text-sm text-gray-500 text-center max-w-sm">
-              Esta hospedagem não suporta WebSocket persistente.
-              <br />
-              Use o <strong className="text-gray-300">Dashboard</strong> para acompanhar os alunos em tempo real.
-            </p>
-          </div>
         ) : (
-          <div
-            className="grid gap-3 w-full h-full"
-            style={liveGridStyle(livePlayers.length)}
-          >
-            <AnimatePresence mode="popLayout">
-              {livePlayers.map((p, i) => (
-                <LiveScreenPanel key={p.playerId} player={p} index={i} />
-              ))}
-            </AnimatePresence>
+          <div className="flex flex-col gap-3 h-full">
+            {wsUnavailable && (
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 rounded text-xs font-mono flex-shrink-0"
+                style={{ background: "#1a1000", border: "1px solid #7a4a00", color: "#f39c12" }}
+              >
+                <span>📡</span>
+                <span>Modo captura por HTTP (~2,5 s) — WebSocket não disponível nesta hospedagem.</span>
+              </div>
+            )}
+            <div
+              className="grid gap-3 w-full flex-1 min-h-0"
+              style={liveGridStyle(livePlayers.length)}
+            >
+              <AnimatePresence mode="popLayout">
+                {livePlayers.map((p, i) => (
+                  <LiveScreenPanel key={p.playerId} player={p} index={i} />
+                ))}
+              </AnimatePresence>
+            </div>
           </div>
         )}
       </div>
