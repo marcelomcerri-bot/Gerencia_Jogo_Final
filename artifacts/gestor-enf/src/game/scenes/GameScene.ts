@@ -1518,7 +1518,9 @@ export class GameScene extends Phaser.Scene {
     };
 
     ws.onclose = () => {
-      clearTimeout(failTimer);
+      // Do NOT clear failTimer here — if WS fails before opening, the timer
+      // must still fire so the HTTP screenshot fallback is activated.
+      // Only onopen clears it (WS actually succeeded).
       this._screenWs = null;
       if (this._screenFrameRAF) { cancelAnimationFrame(this._screenFrameRAF); this._screenFrameRAF = 0; }
       this._screenEncoding = false;
