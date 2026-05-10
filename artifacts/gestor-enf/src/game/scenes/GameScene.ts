@@ -43,7 +43,7 @@ export class GameScene extends Phaser.Scene {
 
   // WebSocket screen-share stream
   private _screenWs: WebSocket | null = null;
-  private _screenFrameInterval: ReturnType<typeof setInterval> | null = null;
+  private _screenFrameTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Ambient lights/decor
   private darkOverlay!: Phaser.GameObjects.RenderTexture;
@@ -1497,15 +1497,12 @@ export class GameScene extends Phaser.Scene {
     this._screenWs = ws;
 
     ws.onopen = () => {
-      if (this._screenFrameInterval) clearInterval(this._screenFrameInterval);
-      // Send a frame immediately, then every 150 ms
-      this._sendScreenFrame();
-      this._screenFrameInterval = setInterval(() => this._sendScreenFrame(), 150);
+      this._scheduleNextFrame();
     };
 
     ws.onclose = () => {
       this._screenWs = null;
-      if (this._screenFrameInterval) { clearInterval(this._screenFrameInterval); this._screenFrameInterval = null; }
+      if (this._screenFrameTimer) { clearTimeout(this._screenFrameTimer); this._screenFrameTimer = null; }
       // Auto-reconnect
       setTimeout(() => {
         const room = (window as any).sessionRoom as { code: string; playerId: string; playerName?: string } | undefined;
@@ -1518,23 +1515,45 @@ export class GameScene extends Phaser.Scene {
     ws.onerror = () => ws.close();
   }
 
-  private _sendScreenFrame() {
+  // Use recursive setTimeout so a new frame is never scheduled until the
+  // previous send (and encode) has fully completed — prevents overlap and
+  // ensures the game's JS thread isn't choked by back-to-back encodes.
+  private _scheduleNextFrame() {
     if (!this._screenWs || this._screenWs.readyState !== WebSocket.OPEN) return;
+    this._screenFrameTimer = setTimeout(() => {
+      this._sendScreenFrame();
+      this._scheduleNextFrame();
+    }, 66); // ~15 fps — fast enough to look smooth, light enough not to stutter
+  }
+
+  private _sendScreenFrame() {
+    const ws = this._screenWs;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    // KEY: if the send buffer has data queued, drop this frame entirely.
+    // Without this guard, slow connections build a growing backlog and the
+    // professor sees frames that are minutes old.
+    if (ws.bufferedAmount > 32768) return; // 32 KB threshold
+
     try {
       const src = this.game.canvas;
       if (!src || src.width === 0 || src.height === 0) return;
-      // Draw at full native canvas resolution — no downscale
+
+      // Encode at 640×360 — half of 720p but still HD.
+      // toDataURL on a 640×360 canvas takes ~8–15 ms vs ~80–120 ms for 1280×720,
+      // so it no longer blocks Phaser's game loop noticeably.
       const tmp = document.createElement('canvas');
-      tmp.width = src.width;
-      tmp.height = src.height;
+      tmp.width = 640;
+      tmp.height = 360;
       const ctx = tmp.getContext('2d');
       if (!ctx) return;
-      ctx.drawImage(src, 0, 0);
-      const dataUrl = tmp.toDataURL('image/jpeg', 0.78);
-      if (dataUrl.length < 5000) return; // blank/black frame — skip
+      ctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, 640, 360);
+      const dataUrl = tmp.toDataURL('image/jpeg', 0.72);
+      if (dataUrl.length < 4000) return; // blank/black frame — skip
+
       const levelInfo = getLevelInfo(this.state.prestige);
       const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
-      this._screenWs.send(JSON.stringify({
+      ws.send(JSON.stringify({
         type: 'frame',
         screenshot: dataUrl,
         stats: {
@@ -1552,7 +1571,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private _destroyScreenShare() {
-    if (this._screenFrameInterval) { clearInterval(this._screenFrameInterval); this._screenFrameInterval = null; }
+    if (this._screenFrameTimer) { clearTimeout(this._screenFrameTimer); this._screenFrameTimer = null; }
     if (this._screenWs) { this._screenWs.onclose = null; this._screenWs.close(); this._screenWs = null; }
   }
 

@@ -28,6 +28,8 @@ interface PlayerState {
 function roomApiPlugin(): Plugin {
   const rooms = new Map<string, Map<string, PlayerState>>();
 
+  // .unref() prevents this interval from keeping the Node.js process alive during
+  // `vite build` — without it, the build never exits and Netlify times out.
   setInterval(() => {
     const now = Date.now();
     for (const [roomCode, players] of rooms) {
@@ -36,7 +38,7 @@ function roomApiPlugin(): Plugin {
       }
       if (players.size === 0) rooms.delete(roomCode);
     }
-  }, 30000);
+  }, 30000).unref();
 
   return {
     name: "room-api",

@@ -1,0 +1,56 @@
+The Netlify deploy errored, with the following guidance provided:
+
+Diagnosis
+
+The client build completed successfully (see the Vite output at lines 76–85), but the Netlify build process timed out after ~18 minutes at a subsequent step (lines 86–87). The failure is a build timeout, not a compilation error.
+Most likely cause: the repository's build command runs a long‑running process (for example a server, a watch mode, or another step that doesn't exit), or an additional build step after Vite is very slow and exceeds Netlify's build time limit. Netlify kills builds that run longer than the plan limit, which is why the build stopped even though the client assets were produced.
+Solution (step‑by‑step)
+
+Reproduce locally and inspect your build script
+
+Run the same build command that Netlify runs locally to see which step is hanging:
+In Netlify UI or netlify.toml check the configured build command. If you used the default, it is probably npm run build (or pnpm/yarn). Open your repo package.json to verify the "build" script: https://github.com/marcelomcerri-bot/Gerencia_Jogo_Final/blob/main/package.json
+Locally run:
+npm run build
+Observe whether the process exits when Vite finishes or whether something continues running (e.g., a server, watch, or long packaging step).
+If your build script starts a server or a long‑running process, change it so the build finishes
+
+Common culprits:
+"vite preview" or "vite --watch" used in the build script
+A script that runs a server (node server.js) instead of producing build artifacts and exiting
+Example fix: change package.json so "build" only runs the static production build. Edit package.json scripts to something like:
+{
+  "scripts": {
+    "build": "vite build --config vite.config.ts",
+    "preview": "vite preview --port 5173"
+  }
+}
+Commit that change and push, then trigger a new Netlify build. This ensures the build step exits when finished.
+If you do need to build server artifacts or functions that take a long time
+Split the work into distinct finite steps (build client, then build server functions) and ensure each script finishes:
+{
+  "scripts": {
+    "build:client": "vite build --config vite.config.ts",
+    "build:server": "node scripts/build-server.js",
+    "build": "npm run build:client && npm run build:server"
+  }
+}
+Make sure no step uses watch mode or starts a long‑lived process.
+Optimize long build steps or use a plan with longer timeouts
+
+If a step legitimately takes >18 minutes, either optimize the build (cache dependencies, reduce build size, avoid unnecessary bundling) or use a Netlify plan that allows longer build times / contact Netlify support. Note: Netlify enforces build time limits based on plan.
+Verify and re-run
+
+After you change the script(s), run npm run build locally to confirm it completes and exits.
+Push changes and re-run the Netlify build.
+Extra debugging tips
+
+Add logging to each step of your build script to see where time is spent.
+Run the Netlify build command locally via the Netlify CLI to reproduce the environment.
+If you discover a package or a file is missing (not committed) and that’s why a build step waits or errors, verify it is present in package.json or committed before changing external configurations.
+Why this fixes your build
+
+The logs show Vite completed, then Netlify terminated the build because the overall build did not finish within the time limit. Ensuring the build process contains only finite build steps (no watch/preview/server) will let the build exit cleanly and avoid the timeout.
+The relevant error logs are:
+
+Line 0: build-image version: ac6eb13fbf000e5c09ad677efd8b7c3c2d0142b6 (noble-new-builds) Line 1: buildbot version: de14d13d022c18f089944497bd804e269fc4f82f Line 2: Fetching cached dependencies Line 3: Failed to fetch cache, continuing with build Line 4: Starting to prepare the repo for build Line 5: No cached dependencies found. Cloning fresh repo Line 6: git clone --filter=blob:none https://github.com/marcelomcerri-bot/Gerencia_Jogo_Final Line 7: Preparing Git Reference refs/heads/main Line 8: Installing dependencies Line 9: mise ~/.config/mise/config.toml tools: python@3.14.3 Line 10: mise ~/.config/mise/config.toml tools: ruby@3.4.8 Line 11: mise ~/.config/mise/config.toml tools: go@1.26.2 Line 12: Downloading and installing node v24.15.0... Line 13: Downloading https://nodejs.org/dist/v24.15.0/node-v24.15.0-linux-x64.tar.xz... Line 76: > vite build --config vite.config.ts Line 77: vite v7.3.2 building client environment for production... Line 78: transforming... Line 79: ✓ 457 modules transformed. Line 80: rendering chunks... Line 81: computing gzip size... Line 82: dist/public/index.html 1.02 kB │ gzip: 0.51 kB Line 83: dist/public/assets/index-BSAzhSc9.css 125.96 kB │ gzip: 19.32 kB Line 84: dist/public/assets/index-C__1GvF0.js 1,791.13 kB │ gzip: 512.29 kB Line 85: ✓ built in 6.97s Line 86: Failed during stage 'building site': Command did not finish within the time limit Line 87: Execution timed out after 17m59.93911647s Line 88: Failing build: Failed to build site Line 89: Finished processing build request in 18m16.554s
