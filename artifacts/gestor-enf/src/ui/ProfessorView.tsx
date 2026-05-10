@@ -14,6 +14,7 @@ interface PlayerData {
   completedMissions: number;
   lastActivity: string;
   shiftTime: number;
+  screenshot?: string;
 }
 
 const CARD_COLORS = [
@@ -84,7 +85,6 @@ function PlayerCard({ player, index }: { player: PlayerData; index: number }) {
         background: "#0b1929",
       }}
     >
-      {/* Header */}
       <div
         className="flex items-center gap-3 px-4 py-3"
         style={{ background: `${color}18` }}
@@ -117,7 +117,6 @@ function PlayerCard({ player, index }: { player: PlayerData; index: number }) {
         </div>
       </div>
 
-      {/* Body */}
       <div className="px-4 py-3 flex flex-col gap-2.5">
         <div className="flex items-center justify-between">
           <span className="text-xs text-gray-400 font-mono truncate pr-2">
@@ -170,11 +169,144 @@ function gridClass(n: number): string {
   return "grid-cols-4";
 }
 
+// ─── Live screen grid layout ───────────────────────────────────────────────
+function liveGridStyle(n: number): React.CSSProperties {
+  if (n === 1) return { gridTemplateColumns: "1fr" };
+  if (n === 2) return { gridTemplateColumns: "1fr 1fr" };
+  if (n <= 4) return { gridTemplateColumns: "1fr 1fr" };
+  if (n <= 6) return { gridTemplateColumns: "1fr 1fr 1fr" };
+  return { gridTemplateColumns: "1fr 1fr 1fr 1fr" };
+}
+
+function LiveScreenPanel({
+  player,
+  index,
+}: {
+  player: PlayerData;
+  index: number;
+}) {
+  const color = CARD_COLORS[index % CARD_COLORS.length];
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9 }}
+      transition={{ duration: 0.3 }}
+      className="relative overflow-hidden rounded-lg"
+      style={{
+        border: `2px solid ${player.online ? color : "#1e2d40"}`,
+        background: "#030912",
+        aspectRatio: "16/9",
+      }}
+    >
+      {/* Screenshot or placeholder */}
+      {player.screenshot ? (
+        <img
+          src={player.screenshot}
+          alt={`Tela de ${player.playerName}`}
+          className="w-full h-full object-cover"
+          style={{ display: "block" }}
+        />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+          <div className="text-3xl opacity-20">🖥️</div>
+          <p className="text-xs font-mono text-gray-600">
+            {player.online ? "Aguardando captura…" : "Offline"}
+          </p>
+        </div>
+      )}
+
+      {/* Top overlay: name + online dot */}
+      <div
+        className="absolute top-0 left-0 right-0 flex items-center gap-2 px-3 py-1.5"
+        style={{
+          background: "linear-gradient(to bottom, rgba(0,0,0,0.75) 0%, transparent 100%)",
+        }}
+      >
+        <div
+          className="w-2 h-2 rounded-full flex-shrink-0"
+          style={{
+            background: player.online ? "#2ecc71" : "#4a5568",
+            boxShadow: player.online ? "0 0 6px #2ecc71" : "none",
+          }}
+        />
+        <span
+          className="font-mono font-bold text-xs truncate"
+          style={{ color: player.online ? color : "#4a5568" }}
+        >
+          {player.playerName}
+        </span>
+        <span className="text-xs font-mono text-gray-400 ml-auto flex-shrink-0">
+          {player.level}
+        </span>
+      </div>
+
+      {/* Bottom overlay: stats bar */}
+      <div
+        className="absolute bottom-0 left-0 right-0 flex items-center gap-3 px-3 py-1.5"
+        style={{
+          background: "linear-gradient(to top, rgba(0,0,0,0.80) 0%, transparent 100%)",
+        }}
+      >
+        {/* Energy */}
+        <div className="flex items-center gap-1 min-w-0 flex-1">
+          <span className="text-xs">⚡</span>
+          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#111c2e" }}>
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${Math.max(0, Math.min(100, player.energy))}%`,
+                background: player.energy > 50 ? "#2ecc71" : player.energy > 25 ? "#f39c12" : "#e74c3c",
+              }}
+            />
+          </div>
+        </div>
+        {/* Stress */}
+        <div className="flex items-center gap-1 min-w-0 flex-1">
+          <span className="text-xs">😰</span>
+          <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: "#111c2e" }}>
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${Math.max(0, Math.min(100, player.stress))}%`,
+                background: player.stress > 70 ? "#e74c3c" : player.stress > 40 ? "#f39c12" : "#2ecc71",
+              }}
+            />
+          </div>
+        </div>
+        {/* Prestige */}
+        <span className="text-xs font-mono whitespace-nowrap flex-shrink-0" style={{ color }}>
+          ⭐ {player.prestige}
+        </span>
+        {/* Room */}
+        <span className="text-xs font-mono text-gray-400 truncate flex-shrink-0 max-w-[80px]">
+          📍 {player.currentRoom}
+        </span>
+      </div>
+
+      {/* Offline overlay */}
+      {!player.online && (
+        <div
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.55)" }}
+        >
+          <span className="text-xs font-mono text-gray-500 uppercase tracking-widest">
+            Offline
+          </span>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 export function ProfessorView() {
   const navigate = useNavigate();
   const [players, setPlayers] = useState<PlayerData[]>([]);
   const [error, setError] = useState("");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [viewMode, setViewMode] = useState<"dashboard" | "live">("dashboard");
 
   const fetchPlayers = useCallback(async () => {
     try {
@@ -198,7 +330,6 @@ export function ProfessorView() {
   const onlineCount = players.filter((p) => p.online).length;
 
   return (
-    /* pointer-events-auto is critical: this sits inside a pointer-events-none shell in App.tsx */
     <div
       className="fixed inset-0 flex flex-col overflow-hidden pointer-events-auto"
       style={{ background: "#060e1a", zIndex: 200 }}
@@ -238,7 +369,7 @@ export function ProfessorView() {
         </div>
       </div>
 
-      {/* Stats bar */}
+      {/* Stats + view toggle bar */}
       <div
         className="flex items-center gap-6 px-6 py-3 border-b flex-shrink-0"
         style={{ borderColor: "#0e2a1e", background: "#081420" }}
@@ -257,11 +388,35 @@ export function ProfessorView() {
           </span>
         )}
         {error && (
-          <span className="text-xs font-mono text-red-500 ml-auto">{error}</span>
+          <span className="text-xs font-mono text-red-500">{error}</span>
         )}
+
+        {/* View toggle */}
+        <div className="ml-auto flex items-center gap-1 rounded-lg overflow-hidden border" style={{ borderColor: "#1e3a5f" }}>
+          <button
+            onClick={() => setViewMode("dashboard")}
+            className="px-4 py-1.5 text-xs font-mono transition-colors"
+            style={{
+              background: viewMode === "dashboard" ? "#1abc9c" : "transparent",
+              color: viewMode === "dashboard" ? "#060e1a" : "#4a7a9b",
+            }}
+          >
+            📊 Dashboard
+          </button>
+          <button
+            onClick={() => setViewMode("live")}
+            className="px-4 py-1.5 text-xs font-mono transition-colors"
+            style={{
+              background: viewMode === "live" ? "#1abc9c" : "transparent",
+              color: viewMode === "live" ? "#060e1a" : "#4a7a9b",
+            }}
+          >
+            📺 Telas ao Vivo
+          </button>
+        </div>
       </div>
 
-      {/* Dashboard */}
+      {/* Main content */}
       <div className="flex-1 overflow-auto p-5">
         {players.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -275,11 +430,22 @@ export function ProfessorView() {
               eles aparecerão aqui automaticamente.
             </p>
           </div>
-        ) : (
+        ) : viewMode === "dashboard" ? (
           <div className={`grid gap-4 w-full ${gridClass(players.length)}`}>
             <AnimatePresence mode="popLayout">
               {players.map((p, i) => (
                 <PlayerCard key={p.playerId} player={p} index={i} />
+              ))}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <div
+            className="grid gap-3 w-full h-full"
+            style={liveGridStyle(players.length)}
+          >
+            <AnimatePresence mode="popLayout">
+              {players.map((p, i) => (
+                <LiveScreenPanel key={p.playerId} player={p} index={i} />
               ))}
             </AnimatePresence>
           </div>

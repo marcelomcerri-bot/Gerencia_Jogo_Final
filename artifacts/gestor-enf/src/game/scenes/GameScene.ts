@@ -1461,6 +1461,18 @@ export class GameScene extends Phaser.Scene {
     if (!room?.code || !room?.playerId) return;
     const levelInfo = getLevelInfo(this.state.prestige);
     const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
+
+    // Capture a low-res screenshot of the game canvas
+    let screenshot: string | undefined;
+    try {
+      const src = this.game.canvas;
+      const tmp = document.createElement('canvas');
+      tmp.width = 480;
+      tmp.height = 270;
+      tmp.getContext('2d')?.drawImage(src, 0, 0, 480, 270);
+      screenshot = tmp.toDataURL('image/jpeg', 0.3);
+    } catch { /* silent */ }
+
     try {
       await fetch(`/__rooms/${encodeURIComponent(room.code)}/heartbeat`, {
         method: 'POST',
@@ -1475,6 +1487,7 @@ export class GameScene extends Phaser.Scene {
           completedMissions: this.state.completedMissions.length,
           lastActivity: this.lastActivity,
           shiftTime: Math.floor(this.state.gameTime / 60),
+          screenshot,
         }),
       });
     } catch { /* silent — never interrupt gameplay */ }

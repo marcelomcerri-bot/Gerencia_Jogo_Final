@@ -21,6 +21,7 @@ interface PlayerState {
   completedMissions: number;
   lastActivity: string;
   shiftTime: number;
+  screenshot?: string;
 }
 
 function roomApiPlugin(): Plugin {
