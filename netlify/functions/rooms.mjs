@@ -2,9 +2,8 @@
  * Netlify Function v2 — Room API for Modo Professor
  *
  * Uses Netlify Blobs for persistent state across function instances.
- * Each player is stored under key "{roomCode}/{playerId}".
- * Heartbeat is an upsert — creates the player if not found, so there is
- * never a 404 loop due to cold-start or key-not-found edge cases.
+ * Key format: "{roomCode}/{playerId}"  (path-style, no special chars)
+ * Heartbeat is an upsert — creates the player if not found.
  *
  * Handles: GET  /__rooms/:roomCode/players
  *          POST /__rooms/:roomCode/join
@@ -23,6 +22,17 @@ const CORS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
 };
+
+/** Safe JSON fetch from blob store — never throws, returns null on any error */
+async function blobGetJson(store, key) {
+  try {
+    const raw = await store.get(key);
+    if (raw == null) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
 
 export default async function handler(req, context) {
   if (req.method === "OPTIONS") {
@@ -56,16 +66,14 @@ export default async function handler(req, context) {
   }
 
   const now = Date.now();
-  // Use "/" as separator — safe for Netlify Blobs path-style keys
+  // Path-style key prefix — definitely safe for Netlify Blobs
   const prefix = `${roomCode}/`;
 
-  // ── GET /__rooms/:roomCode/players ────────────────────────────────────────
+  // ── GET /__rooms/:roomCode/players ─────────────────────────────────────────
   if (req.method === "GET" && action === "players") {
     try {
       const { blobs } = await store.list({ prefix });
-      const all = await Promise.all(
-        blobs.map((b) => store.get(b.key, { type: "json" }).catch(() => null))
-      );
+      const all = await Promise.all(blobs.map((b) => blobGetJson(store, b.key)));
       const players = all
         .filter((p) => p !== null && now - p.lastSeen < STALE_MS)
         .map((p) => ({ ...p, online: now - p.lastSeen < 7000 }));
@@ -75,11 +83,11 @@ export default async function handler(req, context) {
     }
   }
 
-  // ── POST endpoints — parse body ───────────────────────────────────────────
+  // ── POST endpoints — parse body ────────────────────────────────────────────
   let data = {};
   try { data = await req.json(); } catch { /* ignore */ }
 
-  // ── POST /__rooms/:roomCode/join ──────────────────────────────────────────
+  // ── POST /__rooms/:roomCode/join ───────────────────────────────────────────
   if (req.method === "POST" && action === "join") {
     const playerName = (data.playerName || "Estudante").slice(0, 32);
     const playerId = `${now}-${Math.random().toString(36).slice(2, 8)}`;
@@ -98,9 +106,9 @@ export default async function handler(req, context) {
     return new Response(JSON.stringify({ playerId }), { headers: CORS });
   }
 
-  // ── POST /__rooms/:roomCode/heartbeat ─────────────────────────────────────
-  // Heartbeat is an upsert: if the player blob is missing (cold start, etc.)
-  // we create it from the heartbeat data rather than returning 404.
+  // ── POST /__rooms/:roomCode/heartbeat ──────────────────────────────────────
+  // Upsert: if the player blob is missing for any reason, create it from
+  // the heartbeat data so the student is never stuck invisible.
   if (req.method === "POST" && action === "heartbeat") {
     const { playerId, screenshot, ...rest } = data;
     if (!playerId) {
@@ -109,11 +117,8 @@ export default async function handler(req, context) {
       });
     }
     const key = `${prefix}${playerId}`;
+    const existing = await blobGetJson(store, key);
 
-    let existing = null;
-    try { existing = await store.get(key, { type: "json" }); } catch { /* treat as missing */ }
-
-    // Upsert: create a fresh entry if blob wasn't found
     const base = existing || {
       playerId,
       playerName: rest.playerName || "Estudante",
