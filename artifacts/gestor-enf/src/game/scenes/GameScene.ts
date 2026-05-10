@@ -1462,7 +1462,7 @@ export class GameScene extends Phaser.Scene {
     const levelInfo = getLevelInfo(this.state.prestige);
     const roomName = ROOM_NAMES[this.currentRoom] || 'Corredor';
     try {
-      await fetch(`/api/rooms/${encodeURIComponent(room.code)}/heartbeat`, {
+      await fetch(`/__rooms/${encodeURIComponent(room.code)}/heartbeat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -7,9 +7,12 @@
   NODE_VERSION = "24"
   PNPM_VERSION = "10"
 
+[functions]
+  node_bundler = "none"
+
 # Room API — handled by the serverless function (must come before the SPA catch-all)
 [[redirects]]
-  from = "/api/rooms/:roomCode/:action"
+  from = "/__rooms/:roomCode/:action"
   to = "/.netlify/functions/rooms"
   status = 200
   force = true

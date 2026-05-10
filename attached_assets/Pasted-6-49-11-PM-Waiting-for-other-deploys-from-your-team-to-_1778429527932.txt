@@ -1,0 +1,78 @@
+6:49:11 PM: Waiting for other deploys from your team to complete. Check the queue: https://app.netlify.com/teams/marcelomcerri/builds
+6:50:10 PM: build-image version: ac6eb13fbf000e5c09ad677efd8b7c3c2d0142b6 (noble-new-builds)
+6:50:10 PM: buildbot version: de14d13d022c18f089944497bd804e269fc4f82f
+6:50:10 PM: Fetching cached dependencies
+6:50:10 PM: Starting to download cache of 140.1MB (Last modified: 2026-05-06 18:04:55 +0000 UTC)
+6:50:10 PM: Downloaded cache in 461ms
+6:50:13 PM: Extracted cache in 2.351s
+6:50:13 PM: Fetched cache in 2.859s
+6:50:13 PM: Starting to prepare the repo for build
+6:50:13 PM: Preparing Git Reference refs/heads/main
+6:50:14 PM: Custom functions path detected. Proceeding with the specified path: 'netlify/functions'
+6:50:14 PM: Installing dependencies
+6:50:14 PM: mise ~/.config/mise/config.toml tools: python@3.14.3
+6:50:14 PM: mise ~/.config/mise/config.toml tools: ruby@3.4.8
+6:50:15 PM: mise ~/.config/mise/config.toml tools: go@1.26.2
+6:50:15 PM: Downloading and installing node v24.15.0...
+6:50:15 PM: Downloading https://nodejs.org/dist/v24.15.0/node-v24.15.0-linux-x64.tar.xz...
+6:50:15 PM: Computing checksum with sha256sum
+6:50:15 PM: Checksums matched!
+6:50:18 PM: Now using node v24.15.0 (npm v11.12.1)
+6:50:18 PM: Enabling Node.js Corepack
+6:50:19 PM: Found pnpm version (10.30.3) that doesn't match expected (10)
+Preparing pnpm@10 for immediate activation...
+6:50:19 PM: pnpm workspaces detected
+6:50:19 PM: Installing npm packages using pnpm version 10.30.3
+6:50:20 PM: Scope: all 9 workspace projects
+6:50:20 PM: Lockfile is up to date, resolution step is skipped
+6:50:20 PM: Already up to date
+6:50:20 PM: Done in 817ms using pnpm v10.30.3
+6:50:20 PM: npm packages installed using pnpm
+6:50:21 PM: Successfully installed dependencies
+6:50:21 PM: Detected 2 framework(s)
+6:50:21 PM: "hydrogen" at version "unknown"
+6:50:21 PM: "remix" at version "unknown"
+6:50:21 PM: Starting build script
+6:50:22 PM: Section completed: initializing
+6:50:23 PM: ​
+6:50:23 PM: Netlify Build                                                 
+6:50:23 PM: ────────────────────────────────────────────────────────────────
+6:50:23 PM: ​
+6:50:23 PM: ❯ Version
+6:50:23 PM:   @netlify/build 35.13.4
+6:50:23 PM: ​
+6:50:23 PM: ❯ Flags
+6:50:23 PM:   accountId: 68c0d075f8ace9eabca9c61c
+6:50:23 PM:   baseRelDir: true
+6:50:23 PM:   buildId: 69ffabd7dcdfa0000850554c
+6:50:23 PM:   deployId: 69ffabd7dcdfa0000850554e
+6:50:24 PM: ​
+6:50:24 PM: ❯ Current directory
+6:50:24 PM:   /opt/build/repo
+6:50:24 PM: ​
+6:50:24 PM: ❯ Config file
+6:50:24 PM:   /opt/build/repo/netlify.toml
+6:50:24 PM: ​
+6:50:24 PM: ❯ Context
+6:50:24 PM:   production
+6:50:24 PM: ​
+6:50:24 PM: build.command from netlify.toml                               
+6:50:24 PM: ────────────────────────────────────────────────────────────────
+6:50:24 PM: ​
+6:50:24 PM: $ pnpm --filter @workspace/gestor-enf run build
+6:50:24 PM: > @workspace/gestor-enf@0.0.0 build /opt/build/repo/artifacts/gestor-enf
+6:50:24 PM: > vite build --config vite.config.ts
+6:50:24 PM: vite v7.3.2 building client environment for production...
+6:50:24 PM: transforming...
+6:50:30 PM: ✓ 457 modules transformed.
+6:50:31 PM: rendering chunks...
+6:50:31 PM: computing gzip size...
+6:50:31 PM: dist/public/index.html                     1.02 kB │ gzip:   0.51 kB
+6:50:31 PM: dist/public/assets/index-BSAzhSc9.css    125.96 kB │ gzip:  19.32 kB
+6:50:31 PM: dist/public/assets/index-XNUBs8lB.js   1,791.13 kB │ gzip: 512.29 kB
+6:50:31 PM: ✓ built in 6.65s
+7:01:03 PM: Canceling deploy
+7:01:03 PM: Failed during stage 'building site': Command was cancelled
+7:01:03 PM: Execution cancelled
+7:01:03 PM: Failing build: Failed to build site
+7:01:03 PM: Finished processing build request in 10m53.67s

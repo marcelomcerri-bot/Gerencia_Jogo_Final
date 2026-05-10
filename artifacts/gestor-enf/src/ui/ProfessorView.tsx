@@ -178,7 +178,7 @@ export function ProfessorView() {
 
   const fetchPlayers = useCallback(async () => {
     try {
-      const res = await fetch("/api/rooms/GLOBAL/players");
+      const res = await fetch("/__rooms/GLOBAL/players");
       if (!res.ok) throw new Error("fetch failed");
       const data = await res.json();
       setPlayers(data.players ?? []);

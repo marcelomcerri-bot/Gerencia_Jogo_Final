@@ -40,7 +40,7 @@ function roomApiPlugin(): Plugin {
     name: "room-api",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith("/api/rooms")) return next();
+        if (!req.url?.startsWith("/__rooms")) return next();
 
         res.setHeader("Content-Type", "application/json");
         res.setHeader("Access-Control-Allow-Origin", "*");
@@ -54,7 +54,7 @@ function roomApiPlugin(): Plugin {
 
         const urlPath = (req.url ?? "").replace(/\?.*$/, "");
         const segments = urlPath
-          .replace("/api/rooms/", "")
+          .replace("/__rooms/", "")
           .split("/")
           .filter(Boolean);
         const roomCode = segments[0];

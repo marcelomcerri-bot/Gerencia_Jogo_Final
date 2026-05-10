@@ -30,7 +30,7 @@ async function registerInGlobalRoom() {
     // Use PUT-style upsert: join always re-registers with the same stored ID.
     // Since our API generates a new ID, we track ours separately and send
     // heartbeats using window.sessionRoom which is set here.
-    const res = await fetch("/api/rooms/GLOBAL/join", {
+    const res = await fetch("/__rooms/GLOBAL/join", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ playerName }),

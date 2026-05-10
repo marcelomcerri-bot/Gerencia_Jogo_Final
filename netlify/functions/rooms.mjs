@@ -1,9 +1,9 @@
 /**
  * Netlify Function v2 — Room API for Modo Professor
  *
- * Handles: GET  /api/rooms/:roomCode/players
- *          POST /api/rooms/:roomCode/join
- *          POST /api/rooms/:roomCode/heartbeat
+ * Handles: GET  /__rooms/:roomCode/players
+ *          POST /__rooms/:roomCode/join
+ *          POST /__rooms/:roomCode/heartbeat
  *
  * State is kept in module-level memory. While serverless functions can scale
  * across instances, Netlify typically reuses the same warm instance for
@@ -48,7 +48,7 @@ export default async function handler(req, context) {
   if (!rooms.has(roomCode)) rooms.set(roomCode, new Map());
   const room = rooms.get(roomCode);
 
-  // ── GET /api/rooms/:roomCode/players ─────────────────────────────────────
+  // ── GET /__rooms/:roomCode/players ────────────────────────────────────────
   if (req.method === "GET" && action === "players") {
     const now = Date.now();
     const players = [...room.values()].map((p) => ({
@@ -66,7 +66,7 @@ export default async function handler(req, context) {
     /* ignore parse errors */
   }
 
-  // ── POST /api/rooms/:roomCode/join ────────────────────────────────────────
+  // ── POST /__rooms/:roomCode/join ──────────────────────────────────────────
   if (req.method === "POST" && action === "join") {
     const playerName = (data.playerName || "Estudante").slice(0, 32);
     const playerId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -86,7 +86,7 @@ export default async function handler(req, context) {
     return new Response(JSON.stringify({ playerId }), { headers: CORS });
   }
 
-  // ── POST /api/rooms/:roomCode/heartbeat ───────────────────────────────────
+  // ── POST /__rooms/:roomCode/heartbeat ─────────────────────────────────────
   if (req.method === "POST" && action === "heartbeat") {
     const playerId = data.playerId;
     if (!playerId || !room.has(playerId)) {
@@ -107,5 +107,5 @@ export default async function handler(req, context) {
 }
 
 export const config = {
-  path: "/api/rooms/:roomCode/:action",
+  path: "/__rooms/:roomCode/:action",
 };
