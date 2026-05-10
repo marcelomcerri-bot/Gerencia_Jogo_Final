@@ -38,6 +38,9 @@ export class GameScene extends Phaser.Scene {
   private nextCrisisTime = 0;
   private lastActivity = 'Explorando o hospital';
 
+  // Native interval handle — immune to Phaser clock throttling in background tabs
+  private _heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
   // Ambient lights/decor
   private darkOverlay!: Phaser.GameObjects.RenderTexture;
   private glowBrush!: Phaser.GameObjects.Sprite;
@@ -75,8 +78,15 @@ export class GameScene extends Phaser.Scene {
     // Auto-save every 30s
     this.time.addEvent({ delay: 30000, loop: true, callback: () => saveGame(this.state) });
 
-    // Professor mode: broadcast state every 5s
-    this.time.addEvent({ delay: 5000, loop: true, callback: () => this.broadcastState() });
+    // Professor mode: use native setInterval so it keeps firing even when this
+    // tab is backgrounded (Phaser's own clock pauses/throttles in hidden tabs).
+    this._heartbeatInterval = setInterval(() => this.broadcastState(), 2500);
+    this.events.once(Phaser.Core.Events.DESTROY, () => {
+      if (this._heartbeatInterval !== null) {
+        clearInterval(this._heartbeatInterval);
+        this._heartbeatInterval = null;
+      }
+    });
 
     // Schedule first crisis event (1-2 game minutes = 20-40s real)
     this.scheduleCrisis();

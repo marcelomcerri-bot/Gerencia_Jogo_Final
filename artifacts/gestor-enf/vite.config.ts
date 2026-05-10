@@ -44,6 +44,8 @@ function roomApiPlugin(): Plugin {
         if (!req.url?.startsWith("/__rooms")) return next();
 
         res.setHeader("Content-Type", "application/json");
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
         res.setHeader("Access-Control-Allow-Origin", "*");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -69,7 +71,7 @@ function roomApiPlugin(): Plugin {
           const now = Date.now();
           const players = [...room.values()].map((p) => ({
             ...p,
-            online: now - p.lastSeen < 20000,
+            online: now - p.lastSeen < 7000,
           }));
           return res.end(JSON.stringify({ players }));
         }

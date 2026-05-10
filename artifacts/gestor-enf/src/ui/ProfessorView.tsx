@@ -323,7 +323,7 @@ export function ProfessorView() {
 
   useEffect(() => {
     fetchPlayers();
-    const id = setInterval(fetchPlayers, 3000);
+    const id = setInterval(fetchPlayers, 1500);
     return () => clearInterval(id);
   }, [fetchPlayers]);
 
