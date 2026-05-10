@@ -179,7 +179,10 @@ function LiveScreenPanel({
   index: number;
 }) {
   const color = CARD_COLORS[index % CARD_COLORS.length];
-  const isOnline = player.wsOnline;
+  // WS online = real-time WebSocket frame arrived recently.
+  // HTTP online = heartbeat arrived within 7s (Netlify fallback).
+  // Either counts as "online" so the overlay never covers active students.
+  const isOnline = player.wsOnline || player.online;
 
   return (
     <motion.div
@@ -496,7 +499,7 @@ export function ProfessorView() {
 
   const displayPlayers = viewMode === "live" ? livePlayers : players;
   const onlineCount = viewMode === "live"
-    ? livePlayers.filter((p) => p.wsOnline).length
+    ? livePlayers.filter((p) => p.wsOnline || p.online).length
     : players.filter((p) => p.online).length;
   const wsConnected = wsRef.current?.readyState === WebSocket.OPEN;
 
